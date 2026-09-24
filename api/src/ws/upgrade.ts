@@ -1,6 +1,6 @@
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { Hono } from "hono";
-import { wsManager } from "./manager.js";
+import { wsManager } from "./manager";
 
 export function setupWebSocket(app: Hono) {
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });

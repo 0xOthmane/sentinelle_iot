@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+export const sensorDataSchema = z.object({
+  ts: z.number(),
+  t: z.number(),
+  h: z.number(),
+  seq: z.number().optional(),
+});
+
 export const thresholdsSchema = z.object({
   tMin: z.number().nullable(),
   tMax: z.number().nullable(),

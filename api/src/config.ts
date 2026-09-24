@@ -6,7 +6,7 @@ export const CONFIG = {
   MQTT_BROKER_URL: process.env.MQTT_BROKER_URL!,
   MQTT_USERNAME: process.env.MQTT_USERNAME!,
   MQTT_PASSWORD: process.env.MQTT_PASSWORD!,
-  MQTT_TOPIC_DATA: "sentinelle/+/+/data",
+  MQTT_TOPICS_SUBSCRIBE: ["sentinelle/+/+/telemetry", "sentinelle/+/+/status"],
   MQTT_TOPIC_CMD_PREFIX: "sentinelle",
 
   DB_PATH: process.env.DB_PATH || "./sentinelle.db",
