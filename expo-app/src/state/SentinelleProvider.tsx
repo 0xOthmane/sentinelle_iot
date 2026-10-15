@@ -14,6 +14,7 @@ import {
 import { Alert, AppState } from 'react-native';
 
 import {
+  fetchActiveAlerts,
   fetchDevices,
   fetchHistory,
   fetchLiveMeasurements,
@@ -21,7 +22,7 @@ import {
   postCommand,
   putThresholds,
 } from '@/api/client';
-import { createSentinelleSocket } from '@/api/websocket';
+import { createSentinelleSocket, type SnapshotAlert } from '@/api/websocket';
 import {
   addCommand,
   getAllCommands,
@@ -153,6 +154,11 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
   const networkRef = useRef(true);
   const backendRef = useRef(false);
   const historyRangeRef = useRef<HistoryRange>('1h');
+  const activeAlertRef = useRef<AlertEvent | null>(null);
+
+  useEffect(() => {
+    activeAlertRef.current = activeAlert;
+  }, [activeAlert]);
 
   useEffect(() => {
     notificationsRef.current = notificationsEnabled;
@@ -175,6 +181,57 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
       trigger: null,
     });
   }, []);
+
+  // Reconcile server-known active alerts with local state. Used by both the
+  // WS snapshot (push) and GET /alerts/active (poll) so a missed "alert"
+  // frame is recovered on every reconnect/refresh instead of only on the
+  // next firing. Journals/notifies only on transitions to avoid spam.
+  const applySyncedAlerts = useCallback(
+    async (alerts: (AlertEvent | SnapshotAlert)[], source: string) => {
+      const latest = alerts.length > 0 ? alerts[alerts.length - 1] : null;
+      const current = activeAlertRef.current;
+
+      if (!latest) {
+        if (current) {
+          activeAlertRef.current = null;
+          setActiveAlert(null);
+          await addJournalEntry(
+            'alert_cleared',
+            DEVICE_ID,
+            `Retour à la normale (resync ${source})`,
+          );
+          await refreshJournal();
+        }
+        return;
+      }
+
+      const next: AlertEvent = {
+        kind: latest.kind,
+        value: latest.value,
+        threshold: latest.threshold,
+        ts: latest.ts,
+      };
+
+      if (!current || current.kind !== next.kind || current.ts !== next.ts) {
+        activeAlertRef.current = next;
+        setActiveAlert(next);
+        const text = describeAlert(next);
+        await addJournalEntry('alert', DEVICE_ID, `${text} (resync ${source})`);
+        await refreshJournal();
+        await notifyLocal('Alerte dans la chambre', text);
+      }
+    },
+    [notifyLocal, refreshJournal],
+  );
+
+  const loadActiveAlerts = useCallback(async () => {
+    try {
+      const alerts = await fetchActiveAlerts(API_URL, DEVICE_ID);
+      await applySyncedAlerts(alerts, 'http');
+    } catch (error) {
+      log('net', 'active-alerts', error);
+    }
+  }, [applySyncedAlerts]);
 
   // ---------- loaders (network + cache fallback) ----------
 
@@ -267,7 +324,14 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
     await loadLiveMeasurements();
     await loadHistory(historyRangeRef.current);
     await loadThresholds();
-  }, [loadDevices, loadLiveMeasurements, loadHistory, loadThresholds]);
+    await loadActiveAlerts();
+  }, [
+    loadDevices,
+    loadLiveMeasurements,
+    loadHistory,
+    loadThresholds,
+    loadActiveAlerts,
+  ]);
 
   // ---------- commands ----------
 
@@ -451,6 +515,9 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
         setBackendOnline(true);
         await syncDirtyThresholds();
         await flushCommandQueue();
+        // Snapshot may arrive a frame later; HTTP resync covers the case
+        // where it was missed or the socket was opened before thresholds.
+        await loadActiveAlerts();
       },
       onError: () => {
         backendRef.current = false;
@@ -488,6 +555,7 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
         await refreshJournal();
       },
       onAlert: async (alertData) => {
+        activeAlertRef.current = alertData;
         setActiveAlert(alertData);
         const text = describeAlert(alertData);
         await addJournalEntry('alert', DEVICE_ID, text);
@@ -495,6 +563,7 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
         await notifyLocal('Alerte dans la chambre', text);
       },
       onAlertCleared: async (kind) => {
+        activeAlertRef.current = null;
         setActiveAlert(null);
         await addJournalEntry(
           'alert_cleared',
@@ -502,6 +571,9 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
           `Retour à la normale (${formatAlertKind(kind)})`,
         );
         await refreshJournal();
+      },
+      onSnapshot: async (alerts) => {
+        await applySyncedAlerts(alerts, 'snapshot');
       },
       onCommandAcked: async (id) => {
         await updateCommandStatus(id, 'acked');
@@ -514,7 +586,14 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
         await refreshJournal();
       },
     });
-  }, [flushCommandQueue, notifyLocal, refreshJournal, syncDirtyThresholds]);
+  }, [
+    applySyncedAlerts,
+    flushCommandQueue,
+    loadActiveAlerts,
+    notifyLocal,
+    refreshJournal,
+    syncDirtyThresholds,
+  ]);
 
   // ---------- lifecycle ----------
 

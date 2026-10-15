@@ -47,5 +47,19 @@ export function initializeSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_events_device_ts
       ON events(device, ts);
+
+    -- Durable alert/violation state so a missed WS frame or an API
+    -- restart doesn't lose active alerts or in-progress hold windows.
+    CREATE TABLE IF NOT EXISTS alert_states (
+      device              TEXT NOT NULL REFERENCES devices(id),
+      kind                TEXT NOT NULL,
+      first_violation_ts  INTEGER NOT NULL,
+      alerted             INTEGER NOT NULL DEFAULT 0
+                          CHECK(alerted IN (0,1)),
+      value               REAL,
+      threshold           REAL,
+      updated_ts          INTEGER NOT NULL,
+      PRIMARY KEY (device, kind)
+    );
   `);
 }

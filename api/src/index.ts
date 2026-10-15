@@ -14,6 +14,7 @@ import { devicesRoute } from "./routes/devices.route.js";
 import { measurementsRoute } from "./routes/measurements.route.js";
 import { thresholdsRoute } from "./routes/thresholds.route.js";
 import { commandsRoute } from "./routes/commands.route.js";
+import { alertsRoute } from "./routes/alerts.route.js";
 
 const app = new Hono();
 
@@ -32,6 +33,7 @@ app.route("/devices", devicesRoute);
 app.route("/devices", measurementsRoute);
 app.route("/devices", thresholdsRoute);
 app.route("/devices", commandsRoute);
+app.route("/devices", alertsRoute);
 
 const { injectWebSocket } = setupWebSocket(app);
 

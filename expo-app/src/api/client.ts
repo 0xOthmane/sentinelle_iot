@@ -1,4 +1,5 @@
 import type {
+  AlertEvent,
   Device,
   HistoryRange,
   Measurement,
@@ -44,6 +45,15 @@ export async function fetchThresholds(
   deviceId: string,
 ): Promise<Thresholds> {
   return getJson<Thresholds>(`${apiUrl}/devices/${deviceId}/thresholds`);
+}
+
+export async function fetchActiveAlerts(
+  apiUrl: string,
+  deviceId: string,
+): Promise<AlertEvent[]> {
+  return getJson<AlertEvent[]>(
+    `${apiUrl}/devices/${deviceId}/alerts/active`,
+  );
 }
 
 export async function putThresholds(

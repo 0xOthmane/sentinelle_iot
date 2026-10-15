@@ -7,7 +7,7 @@ function env(name: string, fallback: string): string {
   return process.env[name] ?? extra[name] ?? fallback;
 }
 
-const DEFAULT_HOST = '172.20.10.4:3000';
+const DEFAULT_HOST = '10.22.57.36:3003';
 
 function normalizeBaseUrl(raw: string): string {
   return raw.replace(/\/+$/, '');
@@ -21,7 +21,7 @@ const configuredWs = env(
 
 export const API_URL = normalizeBaseUrl(configuredApi);
 export const WS_URL = configuredWs;
-export const DEVICE_ID = env('EXPO_PUBLIC_DEVICE_ID', 'esp05');
+export const DEVICE_ID = env('EXPO_PUBLIC_DEVICE_ID', 'esp-05');
 export const GROUP_NAME = env('EXPO_PUBLIC_GROUP_NAME', 'groupe5');
 export const APP_NAME = env('EXPO_PUBLIC_APP_NAME', 'Petit Nid');
 

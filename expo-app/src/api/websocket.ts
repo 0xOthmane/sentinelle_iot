@@ -1,6 +1,8 @@
 import type { AlertEvent, Measurement } from '@/types';
 import { log } from '@/utils/logger';
 
+export type SnapshotAlert = AlertEvent & { device: string };
+
 export type WsCallbacks = {
   onOpen?: () => void;
   onClose?: () => void;
@@ -9,6 +11,7 @@ export type WsCallbacks = {
   onDeviceStatus?: (status: 'online' | 'offline') => void;
   onAlert?: (alert: AlertEvent) => void;
   onAlertCleared?: (kind: string) => void;
+  onSnapshot?: (alerts: SnapshotAlert[]) => void;
   onCommandAcked?: (id: string) => void;
 };
 
@@ -29,7 +32,25 @@ export function createSentinelleSocket(
     try {
       const message = JSON.parse(event.data as string);
 
+      // Snapshot carries alerts for all devices: fan out before the
+      // per-device filter so a reconnect always resyncs missed alerts.
+      if (message.type === 'snapshot') {
+        const alerts = Array.isArray(message.alerts) ? message.alerts : [];
+        cb.onSnapshot?.(
+          alerts.filter((a: unknown): a is SnapshotAlert => {
+            if (!a || typeof a !== 'object') return false;
+            const rec = a as Record<string, unknown>;
+            return (
+              rec.device === deviceId &&
+              typeof rec.kind === 'string'
+            );
+          }),
+        );
+        return;
+      }
+
       if (message.device !== deviceId && message.type !== 'command_status') {
+        log('ws', `filtered type=${message.type} device=${message.device}`);
         return;
       }
 
