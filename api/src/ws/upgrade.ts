@@ -2,12 +2,20 @@ import { createNodeWebSocket } from "@hono/node-ws";
 import type { Hono } from "hono";
 import { wsManager } from "./manager";
 import { AlertStatesRepo } from "../db/repositories/alertStates.repo";
+import { consumeWsTicket } from "./tickets";
 
 export function setupWebSocket(app: Hono) {
   const { injectWebSocket, upgradeWebSocket } = createNodeWebSocket({ app });
 
   app.get(
     "/ws",
+    async (c, next) => {
+      const ticket = c.req.query("ticket") ?? "";
+      if (!ticket || !consumeWsTicket(ticket)) {
+        return c.json({ error: "Unauthorized" }, 401);
+      }
+      await next();
+    },
     upgradeWebSocket(() => ({
       onOpen(_event, ws) {
         wsManager.register(ws);

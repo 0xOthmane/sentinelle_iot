@@ -1,16 +1,25 @@
 import * as SQLite from 'expo-sqlite';
 
-let database: SQLite.SQLiteDatabase | null = null;
+// Single-flight promises: concurrent callers share one native open and one
+// migration run. On Android, overlapping openDatabaseAsync / prepareAsync
+// calls crash the native module with NullPointerException, so nothing may
+// run in parallel here.
+let openPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let initPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (!database) {
-    database = await SQLite.openDatabaseAsync('sentinelle.db');
+function openDatabase(): Promise<SQLite.SQLiteDatabase> {
+  if (!openPromise) {
+    openPromise = SQLite.openDatabaseAsync('sentinelle.db').catch((error) => {
+      // Allow a later retry instead of caching a rejection forever.
+      openPromise = null;
+      throw error;
+    });
   }
-  return database;
+  return openPromise;
 }
 
-export async function initDatabase(): Promise<void> {
-  const db = await getDatabase();
+async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
+  const db = await openDatabase();
 
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
@@ -64,4 +73,22 @@ export async function initDatabase(): Promise<void> {
       value TEXT NOT NULL
     );
   `);
+
+  return db;
+}
+
+export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+  // Every query waits for the single migration run: no prepare may hit the
+  // native module before the tables exist.
+  if (!initPromise) {
+    initPromise = openAndMigrate().catch((error) => {
+      initPromise = null;
+      throw error;
+    });
+  }
+  return initPromise;
+}
+
+export async function initDatabase(): Promise<void> {
+  await getDatabase();
 }

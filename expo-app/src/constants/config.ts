@@ -33,6 +33,10 @@ export const DEFAULT_THRESHOLDS = {
   holdMinutes: 1,
 } as const;
 
+// Alerts older than this still update the UI on resync, but no longer
+// trigger the automatic night-light command.
+export const ALERT_AUTOMATION_RECENCY_SECONDS = 15 * 60;
+
 export function defaultThresholdForm() {
   return {
     tMin: String(DEFAULT_THRESHOLDS.tMin),

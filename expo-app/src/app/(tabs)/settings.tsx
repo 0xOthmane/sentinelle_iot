@@ -8,9 +8,11 @@ import {
 } from 'react-native';
 import { ScreenShell } from '@/components/ScreenShell';
 import { ScreenTitle, SettingInput } from '@/components/common';
+import { useAuth } from '@/auth/AuthProvider';
 import { useSentinelle } from '@/state/SentinelleProvider';
 
 export default function SettingsScreen() {
+  const { logout } = useAuth();
   const {
     thresholdForm,
     setThresholdForm,
@@ -119,6 +121,10 @@ export default function SettingsScreen() {
           {thresholdLoading ? 'Enregistrement…' : 'Enregistrer les réglages'}
         </Text>
       </Pressable>
+
+      <Pressable style={styles.logoutButton} onPress={() => void logout()}>
+        <Text style={styles.logoutButtonText}>Se déconnecter</Text>
+      </Pressable>
     </ScreenShell>
   );
 }
@@ -195,6 +201,20 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: '#FFFFFF',
+    fontWeight: '800',
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  logoutButton: {
+    borderRadius: 19,
+    paddingVertical: 15,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#EADFD9',
+    backgroundColor: '#FFFFFF',
+  },
+  logoutButtonText: {
+    color: '#96695F',
     fontWeight: '800',
     textAlign: 'center',
     fontSize: 14,

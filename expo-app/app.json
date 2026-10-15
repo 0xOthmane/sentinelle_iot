@@ -22,7 +22,8 @@
       "expo-notifications",
       "expo-sqlite",
       "expo-router",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-secure-store"
     ]
   }
 }
