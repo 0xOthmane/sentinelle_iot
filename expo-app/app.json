@@ -19,6 +19,7 @@
       "predictiveBackGestureEnabled": false
     },
     "plugins": [
+      "expo-notifications",
       "expo-sqlite",
       "expo-router",
       "expo-status-bar"
