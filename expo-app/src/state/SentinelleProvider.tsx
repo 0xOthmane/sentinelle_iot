@@ -1,5 +1,5 @@
 import * as Crypto from 'expo-crypto';
-import * as Notifications from 'expo-notifications';
+import { getNotifications } from '@/utils/notifications';
 import NetInfo from '@react-native-community/netinfo';
 import {
   createContext,
@@ -168,6 +168,8 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
 
   const notifyLocal = useCallback(async (title: string, body: string) => {
     if (!notificationsRef.current) return;
+    const Notifications = getNotifications();
+    if (!Notifications) return;
     await Notifications.scheduleNotificationAsync({
       content: { title, body },
       trigger: null,
@@ -411,6 +413,17 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const Notifications = getNotifications();
+    if (!Notifications) {
+      setNotificationsEnabled(false);
+      await saveNotificationsEnabled(false);
+      Alert.alert(
+        'Notifications indisponibles',
+        'Mettez à jour Expo Go ou installez une nouvelle version de développement compatible. Les alertes restent visibles dans l’app et dans le Journal.',
+      );
+      return;
+    }
+
     const permission = await Notifications.requestPermissionsAsync();
     if (permission.status !== 'granted') {
       setNotificationsEnabled(false);
@@ -543,7 +556,7 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
           last.status === 'pending' || last.status === 'sent',
         );
       }
-      setNotificationsEnabled(notif);
+      setNotificationsEnabled(notif && getNotifications() !== null);
       await refreshJournal();
 
       setLiveLoading(false);
