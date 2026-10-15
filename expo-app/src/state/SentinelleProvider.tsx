@@ -58,6 +58,7 @@ import {
   DEFAULT_THRESHOLDS,
   DEVICE_ID,
   GROUP_NAME,
+  WS_URL,
   defaultThresholdForm,
 } from '@/constants/config';
 import type {
@@ -629,6 +630,7 @@ export function SentinelleProvider({ children }: { children: ReactNode }) {
       if (!session || !networkRef.current) return;
       disconnectRef.current?.();
       disconnectRef.current = createSentinelleSocket(
+        WS_URL,
         API_URL,
         DEVICE_ID,
         {
