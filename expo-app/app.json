@@ -16,7 +16,8 @@
       "supportsTablet": true
     },
     "android": {
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "iot.sentinelle.grp05"
     },
     "plugins": [
       "expo-notifications",
@@ -24,6 +25,12 @@
       "expo-router",
       "expo-status-bar",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6b375f1f-1c14-4a4b-a071-440504bd55ba"
+      }
+    }
   }
 }
