@@ -1,4 +1,6 @@
+import { useCallback } from 'react';
 import {
+  Button,
   Pressable,
   StyleSheet,
   Switch,
@@ -10,6 +12,8 @@ import { ScreenShell } from '@/components/ScreenShell';
 import { ScreenTitle, SettingInput } from '@/components/common';
 import { useAuth } from '@/auth/AuthProvider';
 import { useSentinelle } from '@/state/SentinelleProvider';
+import { resetDatabase } from '@/db/reset-db';
+import * as Sentry from '@sentry/react-native';
 
 export default function SettingsScreen() {
   const { logout } = useAuth();
@@ -25,6 +29,16 @@ export default function SettingsScreen() {
 
   const setField = (key: keyof typeof thresholdForm) => (value: string) =>
     setThresholdForm((old) => ({ ...old, [key]: value }));
+
+  // Wipe the local cache and drop the session: otherwise the next app launch
+  // re-downloads everything while still authenticated and the wipe is moot.
+  const handleReset = useCallback(async () => {
+    try {
+      await resetDatabase();
+    } finally {
+      await logout();
+    }
+  }, [logout]);
 
   return (
     <ScreenShell>
@@ -121,7 +135,21 @@ export default function SettingsScreen() {
           {thresholdLoading ? 'Enregistrement…' : 'Enregistrer les réglages'}
         </Text>
       </Pressable>
-
+      <Pressable
+        onPress={() => void handleReset()}
+        style={({ pressed }) => ({
+          backgroundColor: pressed ? '#991b1b' : '#dc2626',
+          padding: 16,
+          borderRadius: 10,
+          alignItems: 'center',
+          opacity: pressed ? 0.8 : 1,
+        })}
+      >
+        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
+          Reset Database
+        </Text>
+      </Pressable>
+<Button title='Try!' onPress={ () => { Sentry.captureException(new Error('First error')) }}/>
       <Pressable style={styles.logoutButton} onPress={() => void logout()}>
         <Text style={styles.logoutButtonText}>Se déconnecter</Text>
       </Pressable>
