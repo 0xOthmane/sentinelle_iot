@@ -5,6 +5,29 @@ import { wsManager } from "../ws/manager";
 
 type ThresholdKind = "tMin" | "tMax" | "hMin" | "hMax";
 
+// An alert that has fired only clears once the value is back inside the
+// band by this margin, so a reading hovering on the threshold doesn't
+// fire/clear repeatedly (journal spam, night light toggling).
+const CLEAR_MARGIN: Record<ThresholdKind, number> = {
+  tMin: 0.5,
+  tMax: 0.5,
+  hMin: 2,
+  hMax: 2,
+};
+
+function isClearedWithMargin(
+  kind: ThresholdKind,
+  value: number | null,
+  threshold: number | null,
+): boolean {
+  // Missing value or threshold removed: nothing left to hold the alert.
+  if (value === null || threshold === null) return true;
+  const margin = CLEAR_MARGIN[kind];
+  return kind === "tMin" || kind === "hMin"
+    ? value >= threshold + margin
+    : value <= threshold - margin;
+}
+
 export class AlertService {
   private thresholdsRepo = new ThresholdsRepo();
   private eventsRepo = new EventsRepo();
@@ -182,6 +205,14 @@ export class AlertService {
       } else {
         // No violation → clear if was previously tracked
         const existing = this.alertStatesRepo.get(device, check.kind);
+
+        if (
+          existing?.alerted &&
+          !isClearedWithMargin(check.kind, check.value, check.threshold)
+        ) {
+          // Back in range but inside the hysteresis band: keep the alert.
+          continue;
+        }
 
         if (existing?.alerted) {
           const clearedData = { device, ts, kind: check.kind };

@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { useAuth } from '@/auth/AuthProvider';
+import { useAuth } from '@/hooks/useAuth';
 import { APP_NAME } from '@/constants/config';
 import { AuthError, RateLimitError } from '@/api/client';
 

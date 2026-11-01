@@ -7,13 +7,26 @@ export const sensorDataSchema = z.object({
   seq: z.number().optional(),
 });
 
-export const thresholdsSchema = z.object({
-  tMin: z.number().nullable(),
-  tMax: z.number().nullable(),
-  hMin: z.number().nullable(),
-  hMax: z.number().nullable(),
-  holdMinutes: z.number().int().min(1),
-});
+const humidityBound = z.number().min(0).max(100).nullable();
+
+// Mirrors the mobile app's form validation (utils/thresholds.ts): the API is
+// the enforcement point, so it must reject what the app would reject.
+export const thresholdsSchema = z
+  .object({
+    tMin: z.number(),
+    tMax: z.number(),
+    hMin: humidityBound,
+    hMax: humidityBound,
+    holdMinutes: z.number().int().min(1).max(120),
+  })
+  .refine((t) => t.tMin < t.tMax, {
+    message: "tMin must be lower than tMax",
+    path: ["tMin"],
+  })
+  .refine((t) => t.hMin === null || t.hMax === null || t.hMin < t.hMax, {
+    message: "hMin must be lower than hMax",
+    path: ["hMin"],
+  });
 
 export const commandSchema = z
   .object({

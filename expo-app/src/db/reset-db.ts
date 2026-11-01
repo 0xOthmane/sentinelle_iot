@@ -1,4 +1,4 @@
-import { getDatabase } from './database';
+import { getDatabase, runInTransaction } from './database';
 
 const TABLES = [
   'measurements_cache',
@@ -20,12 +20,12 @@ export async function resetDatabase() {
        WHERE type = 'table' AND name = 'sqlite_sequence'`,
     );
 
-    await db.withTransactionAsync(async () => {
+    await runInTransaction(async (tx) => {
       for (const table of TABLES) {
-        await db.execAsync(`DELETE FROM ${table}`);
+        await tx.execAsync(`DELETE FROM ${table}`);
       }
       if (hasSequence) {
-        await db.execAsync('DELETE FROM sqlite_sequence');
+        await tx.execAsync('DELETE FROM sqlite_sequence');
       }
     });
 

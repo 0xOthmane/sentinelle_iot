@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -10,21 +8,7 @@ import {
 import { API_URL } from '@/constants/config';
 import { loginRequest, setUnauthorizedHandler } from '@/api/client';
 import { clearToken, getToken, saveToken } from './tokenStore';
-
-type AuthContextValue = {
-  token: string | null;
-  isReady: boolean;
-  login: (password: string) => Promise<void>;
-  logout: () => Promise<void>;
-};
-
-const AuthContext = createContext<AuthContextValue | null>(null);
-
-export function useAuth(): AuthContextValue {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error('useAuth must be used inside AuthProvider');
-  return value;
-}
+import { AuthContext, type AuthContextValue } from './AuthContext';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);

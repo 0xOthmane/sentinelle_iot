@@ -33,7 +33,7 @@ export function initializeSchema(db: Database.Database): void {
       t_max         REAL,
       h_min         REAL,
       h_max         REAL,
-      hold_minutes  INTEGER NOT NULL DEFAULT 10
+      hold_minutes  INTEGER NOT NULL DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS events (
@@ -62,4 +62,27 @@ export function initializeSchema(db: Database.Database): void {
       PRIMARY KEY (device, kind)
     );
   `);
+
+  // UNIQUE(device, ts, seq) never matches when seq is NULL (NULLs are
+  // distinct in SQLite), so QoS-1 redeliveries were stored twice. Remove
+  // existing duplicates once, then enforce uniqueness with seq coalesced.
+  const hasDedupeIndex = db
+    .prepare(
+      `SELECT 1 FROM sqlite_master
+       WHERE type = 'index' AND name = 'idx_measurements_dedupe'`,
+    )
+    .get();
+  if (!hasDedupeIndex) {
+    db.transaction(() => {
+      db.exec(`
+        DELETE FROM measurements
+        WHERE id NOT IN (
+          SELECT MIN(id) FROM measurements
+          GROUP BY device, ts, IFNULL(seq, -1)
+        );
+        CREATE UNIQUE INDEX idx_measurements_dedupe
+          ON measurements(device, ts, IFNULL(seq, -1));
+      `);
+    })();
+  }
 }

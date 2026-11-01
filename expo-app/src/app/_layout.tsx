@@ -1,7 +1,8 @@
 import { Stack, router, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { AuthProvider, useAuth } from '@/auth/AuthProvider';
+import { AuthProvider } from '@/auth/AuthProvider';
+import { useAuth } from '@/hooks/useAuth';
 import { SentinelleProvider } from '@/state/SentinelleProvider';
 import * as Sentry from '@sentry/react-native';
 

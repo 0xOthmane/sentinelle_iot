@@ -15,29 +15,28 @@ import { StateCard } from '@/components/StateCard';
 import { ThresholdSummary } from '@/components/common';
 import { usePulse } from '@/hooks/usePulse';
 import { useRoomState } from '@/hooks/useRoomState';
-import { useSentinelle } from '@/state/SentinelleProvider';
+import { useSentinelle } from '@/hooks/useSentinelle';
+import { useSentinelleLive } from '@/hooks/useSentinelleLive';
 
 export default function HomeScreen() {
   const {
-    temperature,
-    humidity,
-    liveMeasurements,
     thresholds,
     activeAlert,
     backendOnline,
     networkConnected,
     ledOn,
     ledPending,
-    liveLoading,
     toggleLed,
   } = useSentinelle();
+  const { temperature, humidity, liveMeasurements, liveLoading } =
+    useSentinelleLive();
 
-  const roomState = useRoomState(
+  const roomState = useRoomState({
     activeAlert,
     temperature,
     humidity,
     thresholds,
-  );
+  });
   const pulse = usePulse(activeAlert != null);
 
   return (

@@ -1,8 +1,12 @@
-import { getDatabase } from '@/db/database';
+import { getDatabase, runInTransaction } from '@/db/database';
 import type { HistoryRange, Measurement } from '@/types';
 import { rangeSeconds } from '@/utils/format';
 
 export type CachedMeasurement = Measurement & { device: string };
+
+const RETENTION_SECONDS = 7 * 86400;
+const PRUNE_INTERVAL_SECONDS = 10 * 60;
+let lastPruneAt = 0;
 
 export async function saveMeasurementsToCache(
   device: string,
@@ -10,26 +14,33 @@ export async function saveMeasurementsToCache(
 ): Promise<void> {
   if (!data.length) return;
 
-  const db = await getDatabase();
+  const now = Math.floor(Date.now() / 1000);
+  // Pruning on every live frame was a full DELETE per message.
+  const prune = now - lastPruneAt >= PRUNE_INTERVAL_SECONDS;
 
-  for (const item of data) {
-    await db.runAsync(
-      `INSERT OR REPLACE INTO measurements_cache
-       (device, ts, t, h) VALUES (?, ?, ?, ?)`,
-      device,
-      item.ts,
-      item.t,
-      item.h,
-    );
-  }
+  await runInTransaction(async (db) => {
+    for (const item of data) {
+      await db.runAsync(
+        `INSERT OR REPLACE INTO measurements_cache
+         (device, ts, t, h) VALUES (?, ?, ?, ?)`,
+        device,
+        item.ts,
+        item.t,
+        item.h,
+      );
+    }
 
-  const sevenDaysAgo = Math.floor(Date.now() / 1000) - 7 * 86400;
-  await db.runAsync(
-    `DELETE FROM measurements_cache
-     WHERE device = ? AND ts < ?`,
-    device,
-    sevenDaysAgo,
-  );
+    if (prune) {
+      await db.runAsync(
+        `DELETE FROM measurements_cache
+         WHERE device = ? AND ts < ?`,
+        device,
+        now - RETENTION_SECONDS,
+      );
+    }
+  });
+
+  if (prune) lastPruneAt = now;
 }
 
 export async function loadCachedLive(

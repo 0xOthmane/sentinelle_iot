@@ -6,7 +6,9 @@ import type {
   Thresholds,
 } from '@/types';
 import { rangeBounds, rangeStep } from '@/utils/format';
+import { DEFAULT_THRESHOLDS } from '@/constants/config';
 import { getToken } from '@/auth/tokenStore';
+import { log } from '@/utils/logger';
 
 export class AuthError extends Error {
   constructor(message = 'Unauthorized') {
@@ -24,8 +26,59 @@ export class RateLimitError extends Error {
   }
 }
 
+/** Non-2xx answer from the API (the server was reached). */
+export class HttpError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`HTTP ${status}`);
+    this.name = 'HttpError';
+    this.status = status;
+  }
+
+  /** 4xx: retrying the same request will fail again. */
+  get isClientError(): boolean {
+    return this.status >= 400 && this.status < 500;
+  }
+}
+
+const REQUEST_TIMEOUT_MS = 15_000;
+
+// A request to a dead tunnel can hang for minutes; callers hold "in flight"
+// guards while awaiting, so an unbounded wait would block every later sync.
+async function fetchWithTimeout(
+  url: string,
+  init?: RequestInit,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 type UnauthorizedHandler = () => void;
 let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+type ThresholdResponse = Omit<Thresholds, 'tMin' | 'tMax'> & {
+  tMin: number | null;
+  tMax: number | null;
+};
+
+type MeasurementResponse = Omit<Measurement, 't' | 'h'> & {
+  t: number | null;
+  h: number | null;
+};
+
+function isCompleteMeasurement(
+  measurement: MeasurementResponse,
+): measurement is Measurement {
+  return (
+    Number.isFinite(measurement.t) &&
+    Number.isFinite(measurement.h)
+  );
+}
 
 export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
   unauthorizedHandler = handler;
@@ -41,7 +94,7 @@ async function authedFetch(url: string, init?: RequestInit): Promise<Response> {
   const token = await getToken();
   if (!token) throw new AuthError('No session — please log in');
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     ...init,
     headers: {
       ...(init?.headers as Record<string, string> | undefined),
@@ -58,7 +111,7 @@ async function authedFetch(url: string, init?: RequestInit): Promise<Response> {
       parseRetryAfter(response.headers.get('Retry-After')),
     );
   }
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) throw new HttpError(response.status);
   return response;
 }
 
@@ -67,11 +120,23 @@ async function getJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function getMeasurements(url: string): Promise<Measurement[]> {
+  const measurements = await getJson<MeasurementResponse[]>(url);
+  const complete = measurements.filter(isCompleteMeasurement);
+  if (complete.length < measurements.length) {
+    log(
+      'net',
+      `${measurements.length - complete.length} incomplete measurement(s) ignored`,
+    );
+  }
+  return complete;
+}
+
 export async function loginRequest(
   apiUrl: string,
   password: string,
 ): Promise<{ token: string; expiresAt: number }> {
-  const response = await fetch(`${apiUrl}/auth/login`, {
+  const response = await fetchWithTimeout(`${apiUrl}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password }),
@@ -83,7 +148,7 @@ export async function loginRequest(
       parseRetryAfter(response.headers.get('Retry-After')),
     );
   }
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) throw new HttpError(response.status);
   return (await response.json()) as { token: string; expiresAt: number };
 }
 
@@ -105,7 +170,7 @@ export async function fetchLiveMeasurements(
   windowSeconds = 600,
 ): Promise<Measurement[]> {
   const now = Math.floor(Date.now() / 1000);
-  return getJson<Measurement[]>(
+  return getMeasurements(
     `${apiUrl}/devices/${deviceId}/measurements?from=${now - windowSeconds}&to=${now}`,
   );
 }
@@ -117,7 +182,7 @@ export async function fetchHistory(
 ): Promise<Measurement[]> {
   const { from, to } = rangeBounds(range);
   const step = rangeStep(range);
-  return getJson<Measurement[]>(
+  return getMeasurements(
     `${apiUrl}/devices/${deviceId}/measurements?from=${from}&to=${to}&step=${step}`,
   );
 }
@@ -125,8 +190,22 @@ export async function fetchHistory(
 export async function fetchThresholds(
   apiUrl: string,
   deviceId: string,
-): Promise<Thresholds> {
-  return getJson<Thresholds>(`${apiUrl}/devices/${deviceId}/thresholds`);
+): Promise<{ value: Thresholds; configured: boolean }> {
+  const response = await getJson<ThresholdResponse>(
+    `${apiUrl}/devices/${deviceId}/thresholds`,
+  );
+  const { tMin, tMax, hMin, hMax } = response;
+
+  // The API answers with all-null bounds when the device has no saved
+  // thresholds: it is not alerting yet, so callers must push real values.
+  if (tMin === null && tMax === null && hMin === null && hMax === null) {
+    return { value: { ...DEFAULT_THRESHOLDS }, configured: false };
+  }
+  if (tMin === null || tMax === null) {
+    throw new Error('API returned thresholds without temperature bounds');
+  }
+
+  return { value: { ...response, tMin, tMax }, configured: true };
 }
 
 export async function fetchActiveAlerts(
@@ -155,11 +234,15 @@ export async function putThresholds(
   return (await response.json()) as Thresholds;
 }
 
+/**
+ * POST /devices/:id/commands answers `202 { sent }`: `sent` is true when the
+ * API handed the command to the MQTT broker, false when the broker is down.
+ */
 export async function postCommand(
   apiUrl: string,
   deviceId: string,
   command: { id: string; led: boolean },
-): Promise<{ status?: string } | null> {
+): Promise<{ sent: boolean }> {
   const response = await authedFetch(
     `${apiUrl}/devices/${deviceId}/commands`,
     {
@@ -169,7 +252,8 @@ export async function postCommand(
     },
   );
 
-  return (await response.json().catch(() => null)) as {
-    status?: string;
+  const body = (await response.json().catch(() => null)) as {
+    sent?: unknown;
   } | null;
+  return { sent: body?.sent === true };
 }

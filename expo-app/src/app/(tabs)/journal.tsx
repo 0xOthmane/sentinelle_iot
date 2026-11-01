@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { ScreenShell } from '@/components/ScreenShell';
 import { ScreenTitle } from '@/components/common';
-import { useSentinelle } from '@/state/SentinelleProvider';
+import { useSentinelle } from '@/hooks/useSentinelle';
 import { formatDateTime, journalIcon } from '@/utils/format';
 
 export default function JournalScreen() {

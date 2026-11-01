@@ -1,17 +1,15 @@
 import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { APP_NAME, useSentinelle } from '@/state/SentinelleProvider';
+import { APP_NAME } from '@/constants/config';
+import { useSentinelle } from '@/hooks/useSentinelle';
+import { useSentinelleLive } from '@/hooks/useSentinelleLive';
 import { ConnectionPill, OfflineBanner } from '@/components/Connection';
 import { connectionLabel } from '@/utils/format';
 
 export function ScreenShell({ children }: { children: ReactNode }) {
-  const {
-    backendOnline,
-    deviceStatus,
-    networkConnected,
-    lastMeasurement,
-  } = useSentinelle();
+  const { backendOnline, deviceStatus, networkConnected } = useSentinelle();
+  const { lastMeasurement } = useSentinelleLive();
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>

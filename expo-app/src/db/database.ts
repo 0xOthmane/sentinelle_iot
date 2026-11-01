@@ -92,3 +92,25 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 export async function initDatabase(): Promise<void> {
   await getDatabase();
 }
+
+let transactionChain: Promise<unknown> = Promise.resolve();
+
+/**
+ * Runs `task` inside a transaction, one at a time. withTransactionAsync is
+ * not exclusive and cannot nest, so concurrent callers (live WS frames,
+ * bulk refreshes, a reset) must queue instead of overlapping.
+ */
+export function runInTransaction<T>(
+  task: (db: SQLite.SQLiteDatabase) => Promise<T>,
+): Promise<T> {
+  const run = transactionChain.then(async () => {
+    const db = await getDatabase();
+    let result!: T;
+    await db.withTransactionAsync(async () => {
+      result = await task(db);
+    });
+    return result;
+  });
+  transactionChain = run.catch(() => undefined);
+  return run;
+}

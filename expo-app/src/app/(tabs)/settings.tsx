@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { ScreenShell } from '@/components/ScreenShell';
 import { ScreenTitle, SettingInput } from '@/components/common';
-import { useAuth } from '@/auth/AuthProvider';
-import { useSentinelle } from '@/state/SentinelleProvider';
+import { useAuth } from '@/hooks/useAuth';
+import { useSentinelle } from '@/hooks/useSentinelle';
 import { resetDatabase } from '@/db/reset-db';
 import * as Sentry from '@sentry/react-native';
 

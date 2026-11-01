@@ -4,10 +4,14 @@ import { rateLimiter } from "hono-rate-limiter";
 import { CONFIG } from "../config.js";
 
 function getClientKey(c: Context): string {
+  // Behind a tunnel/proxy the client can send its own X-Forwarded-For, and
+  // the proxy appends the real address at the end: only the last hop can be
+  // trusted. Using the first entry would let anyone pick their own bucket.
   const forwarded = c.req.header("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0].trim();
-    if (first) return first;
+    const hops = forwarded.split(",").map((hop) => hop.trim()).filter(Boolean);
+    const last = hops[hops.length - 1];
+    if (last) return last;
   }
   try {
     const info = getConnInfo(c);

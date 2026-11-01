@@ -8,7 +8,7 @@ import {
 import { ScreenShell } from '@/components/ScreenShell';
 import { SoftChart } from '@/components/SoftChart';
 import { ScreenTitle, StatBox } from '@/components/common';
-import { useSentinelle } from '@/state/SentinelleProvider';
+import { useSentinelle } from '@/hooks/useSentinelle';
 import type { HistoryRange } from '@/types';
 
 const RANGES: HistoryRange[] = ['1h', '24h', '7d'];
