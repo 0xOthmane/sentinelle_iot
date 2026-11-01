@@ -19,7 +19,7 @@ A baby-room monitor. An ESP32 sensor measures temperature and humidity, an API s
 |------|--------|-------|------|
 | Mobile app | [expo-app/](./expo-app) | Expo SDK 57, React Native 0.86, Expo Router, expo-sqlite | [expo-app/README.md](./expo-app/README.md) |
 | Backend API | [api/](./api) | Node.js, Hono, better-sqlite3, MQTT.js, zod | [api/README.md](./api/README.md) |
-| Deploy & test guide | — | EAS Build, ngrok, HiveMQ Cloud (all free tiers) | [DEPLOYMENT.md](./DEPLOYMENT.md) |
+
 
 The ESP32 firmware is **not** part of this repository. It only has to follow the MQTT contract described in [api/README.md](./api/README.md#mqtt-contract).
 
@@ -50,18 +50,14 @@ npm install
 npx expo start --tunnel     # scan the QR code with Expo Go
 ```
 
-To test on a real Android phone against your local API, or to build an installable APK, follow **[DEPLOYMENT.md](./DEPLOYMENT.md)**.
 
 ## Repository layout
 
 ```
 sentinelle_iot/
 ├── README.md            ← you are here
-├── DEPLOYMENT.md        ← deploy / test runbook (Expo + local API + tunnel)
 ├── api/                 ← backend (see api/README.md)
 ├── expo-app/            ← mobile app (see expo-app/README.md)
-├── .agents/ .claude/    ← AI-assistant skills (not part of the product)
-└── skills-lock.json
 ```
 
 ## Known limitations
@@ -71,8 +67,6 @@ These come from reading the code; they are worth knowing before a demo.
 - **Production build of the API is broken.** `npm run build && npm start` fails with `ERR_MODULE_NOT_FOUND`: the project is ESM (`"type": "module"`) but most relative imports lack the `.js` extension. Run the API with `npm run dev` (tsx) until that is fixed.
 - **Command acknowledgements are not implemented server-side.** The app waits for a WebSocket `command_status`/`acked` frame, but the API never subscribes to an ack topic nor emits that frame. The night-light switch therefore stays on "waiting for confirmation", and `sent` commands are re-sent on every reconnect.
 - **`PUT /devices/:id/thresholds` needs a known device.** The `thresholds` table has a foreign key on `devices`, so saving thresholds for a device that has never published returns a 500. The app keeps the values locally and retries on the next sync.
-- **No automated tests** exist yet (`vitest` is configured in `api/` but there are no test files). Use the manual checklist in [DEPLOYMENT.md](./DEPLOYMENT.md#6-test-checklist).
-- **Debug leftovers in the app:** a "Try!" button (sends a test error to Sentry) and a "Reset Database" button on the Settings screen, plus a hard-coded Sentry DSN in `src/app/_layout.tsx`.
 
 ## Security notes
 
