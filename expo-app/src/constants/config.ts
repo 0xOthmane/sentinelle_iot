@@ -24,6 +24,7 @@ export const WS_URL = configuredWs;
 export const DEVICE_ID = env('EXPO_PUBLIC_DEVICE_ID', 'esp-05');
 export const GROUP_NAME = env('EXPO_PUBLIC_GROUP_NAME', 'groupe5');
 export const APP_NAME = env('EXPO_PUBLIC_APP_NAME', 'Petit Nid');
+export const SENTRY_DSN = env('EXPO_PUBLIC_SENTRY_DSN', '');
 
 export const DEFAULT_THRESHOLDS = {
   tMin: 18,

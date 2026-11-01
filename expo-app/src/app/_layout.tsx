@@ -5,9 +5,10 @@ import { AuthProvider } from '@/auth/AuthProvider';
 import { useAuth } from '@/hooks/useAuth';
 import { SentinelleProvider } from '@/state/SentinelleProvider';
 import * as Sentry from '@sentry/react-native';
+import { SENTRY_DSN } from '@/constants/config';
 
 Sentry.init({
-  dsn: 'https://081ab460a0f7a773c74590a7d609ac33@o4510702658125824.ingest.de.sentry.io/4512265393209424',
+  dsn: SENTRY_DSN,
 
   // Adds more context data to events (IP address, cookies, user, etc.)
   // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
