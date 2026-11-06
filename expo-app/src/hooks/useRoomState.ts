@@ -41,7 +41,7 @@ export function useRoomState({
       return {
         kind: 'warning',
         title: 'À surveiller',
-        text: `Hors seuil — alerte après ${thresholds.holdMinutes} min`,
+        text: `Hors seuil — alerte après ${thresholds.holdSeconds} s`,
       };
     }
 

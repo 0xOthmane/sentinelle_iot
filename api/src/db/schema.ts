@@ -33,7 +33,7 @@ export function initializeSchema(db: Database.Database): void {
       t_max         REAL,
       h_min         REAL,
       h_max         REAL,
-      hold_minutes  INTEGER NOT NULL DEFAULT 1
+      hold_seconds  INTEGER NOT NULL DEFAULT 60
     );
 
     CREATE TABLE IF NOT EXISTS events (
@@ -61,7 +61,23 @@ export function initializeSchema(db: Database.Database): void {
       updated_ts          INTEGER NOT NULL,
       PRIMARY KEY (device, kind)
     );
+
+    CREATE TABLE IF NOT EXISTS push_tokens (
+      token       TEXT PRIMARY KEY,
+      platform    TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
+
+  const thresholdColumns = db
+    .prepare(`PRAGMA table_info(thresholds)`)
+    .all() as Array<{ name: string }>;
+  if (!thresholdColumns.some((column) => column.name === "hold_seconds")) {
+    db.exec(`ALTER TABLE thresholds ADD COLUMN hold_seconds INTEGER NOT NULL DEFAULT 60`);
+    if (thresholdColumns.some((column) => column.name === "hold_minutes")) {
+      db.exec(`UPDATE thresholds SET hold_seconds = hold_minutes * 60`);
+    }
+  }
 
   // UNIQUE(device, ts, seq) never matches when seq is NULL (NULLs are
   // distinct in SQLite), so QoS-1 redeliveries were stored twice. Remove

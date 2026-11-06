@@ -27,9 +27,9 @@ The ESP32 firmware is **not** part of this repository. It only has to follow the
 
 1. The sensor publishes `{ts, t, h}` to `sentinelle/<group>/<deviceId>/telemetry` on the MQTT broker.
 2. The API subscribes, stores every measurement in SQLite and broadcasts it over WebSocket.
-3. For each measurement the API compares values to the device's thresholds. A threshold that stays violated for `holdMinutes` raises an **alert**; returning to range clears it.
+3. For each measurement the API compares values to the device's thresholds. A threshold that stays violated for `holdSeconds` raises an **alert**; returning to range clears it.
 4. The app signs in with a shared family password (JWT), loads data over HTTP, and receives live updates over a WebSocket opened with a one-time ticket.
-5. When an alert fires, the app journals it, can show a local notification, and turns the night light on (`POST /devices/:id/commands` → MQTT `.../cmd`). When the alert clears, it turns the light off again only if automation turned it on.
+5. When an alert fires, the API sends an Expo push notification to registered app installations; the app also journals it, can show a local notification while connected, and turns the night light on (`POST /devices/:id/commands` → MQTT `.../cmd`). When the alert clears, it turns the light off again only if automation turned it on.
 6. The app caches everything in a local SQLite database, so it keeps working offline: cached charts, queued LED commands and queued threshold edits are replayed on reconnect.
 
 ## Quick start (local, no phone build)
@@ -65,7 +65,7 @@ sentinelle_iot/
 These come from reading the code; they are worth knowing before a demo.
 
 - **Production build of the API is broken.** `npm run build && npm start` fails with `ERR_MODULE_NOT_FOUND`: the project is ESM (`"type": "module"`) but most relative imports lack the `.js` extension. Run the API with `npm run dev` (tsx) until that is fixed.
-- **Command acknowledgements are not implemented server-side.** The app waits for a WebSocket `command_status`/`acked` frame, but the API never subscribes to an ack topic nor emits that frame. The night-light switch therefore stays on "waiting for confirmation", and `sent` commands are re-sent on every reconnect.
+- **Command acknowledgements are not implemented server-side.** The app treats a successful MQTT publish as delivery acceptance; the firmware does not currently send a WebSocket `command_status`/`acked` frame. The night-light command remains retryable when MQTT is unavailable, but physical device acknowledgement is not confirmed.
 - **`PUT /devices/:id/thresholds` needs a known device.** The `thresholds` table has a foreign key on `devices`, so saving thresholds for a device that has never published returns a 500. The app keeps the values locally and retries on the next sync.
 
 ## Security notes

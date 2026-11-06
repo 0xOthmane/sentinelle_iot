@@ -32,11 +32,13 @@ export function useMeasurements({
   // Updated synchronously by changeHistoryRange so in-flight loads can tell
   // whether their range is still the selected one.
   const historyRangeRef = useRef<HistoryRange>('1h');
+  const latestMeasurementTsRef = useRef<number | null>(null);
 
   const showLive = useCallback((rows: Measurement[]) => {
     setLiveMeasurements(rows);
     if (rows.length) {
       const last = rows[rows.length - 1];
+      latestMeasurementTsRef.current = last.ts;
       setTemperature(last.t);
       setHumidity(last.h);
     }
@@ -116,6 +118,13 @@ export function useMeasurements({
   );
 
   const handleMeasurement = useCallback(async (m: Measurement) => {
+    if (
+      latestMeasurementTsRef.current !== null &&
+      m.ts <= latestMeasurementTsRef.current
+    ) {
+      return;
+    }
+    latestMeasurementTsRef.current = m.ts;
     setTemperature(m.t);
     setHumidity(m.h);
     setLiveMeasurements((previous) => {

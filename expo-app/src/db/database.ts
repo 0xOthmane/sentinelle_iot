@@ -63,7 +63,7 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       t_max REAL NOT NULL,
       h_min REAL,
       h_max REAL,
-      hold_minutes INTEGER NOT NULL,
+      hold_seconds INTEGER NOT NULL DEFAULT 60,
       dirty INTEGER NOT NULL DEFAULT 0,
       cached_at INTEGER NOT NULL
     );
@@ -73,6 +73,20 @@ async function openAndMigrate(): Promise<SQLite.SQLiteDatabase> {
       value TEXT NOT NULL
     );
   `);
+
+  const thresholdColumns = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(thresholds_cache)',
+  );
+  if (!thresholdColumns.some((column) => column.name === 'hold_seconds')) {
+    await db.execAsync(
+      'ALTER TABLE thresholds_cache ADD COLUMN hold_seconds INTEGER NOT NULL DEFAULT 60',
+    );
+    if (thresholdColumns.some((column) => column.name === 'hold_minutes')) {
+      await db.execAsync(
+        'UPDATE thresholds_cache SET hold_seconds = hold_minutes * 60',
+      );
+    }
+  }
 
   return db;
 }

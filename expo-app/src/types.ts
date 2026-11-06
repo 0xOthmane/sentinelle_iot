@@ -12,7 +12,7 @@ export type Thresholds = {
   tMax: number;
   hMin: number | null;
   hMax: number | null;
-  holdMinutes: number;
+  holdSeconds: number;
 };
 
 export type ThresholdForm = {
@@ -20,7 +20,7 @@ export type ThresholdForm = {
   tMax: string;
   hMin: string;
   hMax: string;
-  holdMinutes: string;
+  holdSeconds: string;
 };
 
 export type HistoryRange = '1h' | '24h' | '7d';

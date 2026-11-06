@@ -46,6 +46,9 @@ export function useConnectivity(options: ConnectivityOptions): void {
   });
 
   const disconnectRef = useRef<(() => void) | null>(null);
+  const connectWebSocketRef = useRef<(() => void) | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptRef = useRef(0);
   // Bumped on every connect/disconnect: a pending ticket lookup from an
   // older attempt (or from before unmount) must not open a socket.
   const connectGenRef = useRef(0);
@@ -53,6 +56,10 @@ export function useConnectivity(options: ConnectivityOptions): void {
 
   const disconnect = useCallback(() => {
     connectGenRef.current += 1;
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
     disconnectRef.current?.();
     disconnectRef.current = null;
   }, []);
@@ -77,20 +84,43 @@ export function useConnectivity(options: ConnectivityOptions): void {
         task().catch((error) => log('ws', label, error));
       };
       const handlers = () => latestRef.current.socketHandlers;
+      const scheduleReconnect = () => {
+        if (
+          !isCurrent() ||
+          !latestRef.current.connection.networkRef.current ||
+          reconnectTimerRef.current
+        ) {
+          return;
+        }
+        const delay = Math.min(
+          30_000,
+          1_000 * 2 ** reconnectAttemptRef.current,
+        );
+        reconnectAttemptRef.current += 1;
+        reconnectTimerRef.current = setTimeout(() => {
+          reconnectTimerRef.current = null;
+          if (isCurrent()) connectWebSocketRef.current?.();
+        }, delay);
+      };
 
       disconnectRef.current = createSentinelleSocket(WS_URL, API_URL, DEVICE_ID, {
         onOpen: () => {
           if (!isCurrent()) return;
+          reconnectAttemptRef.current = 0;
           latestRef.current.connection.setBackend(true);
           run('open', () => handlers().onOpen());
         },
         onError: () => {
-          if (isCurrent()) latestRef.current.connection.setBackend(false);
+          if (isCurrent()) {
+            latestRef.current.connection.setBackend(false);
+            scheduleReconnect();
+          }
         },
         onClose: () => {
           const current = latestRef.current.connection;
           if (isCurrent() && current.networkRef.current) {
             current.setBackend(false);
+            scheduleReconnect();
           }
         },
         onMeasurement: (m) => run('measurement', () => handlers().onMeasurement(m)),
@@ -104,6 +134,10 @@ export function useConnectivity(options: ConnectivityOptions): void {
       });
     });
   }, [disconnect]);
+
+  useEffect(() => {
+    connectWebSocketRef.current = connectWebSocket;
+  }, [connectWebSocket]);
 
   useEffect(() => {
     let mounted = true;

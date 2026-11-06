@@ -17,7 +17,7 @@ export const thresholdsSchema = z
     tMax: z.number(),
     hMin: humidityBound,
     hMax: humidityBound,
-    holdMinutes: z.number().int().min(1).max(120),
+    holdSeconds: z.number().int().min(1).max(7200),
   })
   .refine((t) => t.tMin < t.tMax, {
     message: "tMin must be lower than tMax",

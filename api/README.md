@@ -61,8 +61,10 @@ Everything except `/health`, `/auth/login` and the WebSocket upgrade requires `A
 | `GET` | `/ws-ticket` | → `{ ticket, expiresIn }`. Single-use ticket for the WebSocket. |
 | `GET` | `/devices` | → `[{ id, group, status, lastSeen }]`. |
 | `GET` | `/devices/:id/measurements?from&to&step` | Unix-second bounds (default: last 600 s). With `step` (s) values are averaged per bucket. Returns `[{ ts, t, h }]`; `t`/`h` can be `null`. |
-| `GET` | `/devices/:id/thresholds` | → `{ tMin, tMax, hMin, hMax, holdMinutes }`. **All-null bounds + `holdMinutes: 1` mean "not configured"** (no alerting yet). |
-| `PUT` | `/devices/:id/thresholds` | Body as above. Rules: `tMin < tMax`; humidity bounds 0–100 or `null`, `hMin < hMax`; `holdMinutes` integer 1–120. The device must already exist (it has published at least once). |
+| `GET` | `/devices/:id/thresholds` | → `{ tMin, tMax, hMin, hMax, holdSeconds }`. **All-null bounds + `holdSeconds: 60` mean "not configured"** (no alerting yet). |
+| `PUT` | `/devices/:id/thresholds` | Body as above. Rules: `tMin < tMax`; humidity bounds 0–100 or `null`, `hMin < hMax`; `holdSeconds` integer 1–7200. The device must already exist (it has published at least once). |
+| `POST` | `/notifications/push-token` | Register an Expo push token for background alert notifications. |
+| `DELETE` | `/notifications/push-token` | Disable push notifications for the current app installation. |
 | `GET` | `/devices/:id/alerts/active` | → `[{ device, kind, value, threshold, ts }]`. |
 | `POST` | `/devices/:id/commands` | Body `{ "led": boolean, … }` (extra fields are forwarded). Publishes to MQTT. → `202 { sent: boolean }`, `404` unknown device. |
 
@@ -80,7 +82,7 @@ Frames are JSON objects with a `type`:
 | `snapshot` | `{ alerts: [...], ts }` | Right after connecting: all currently active alerts. |
 | `measurement` | `{ device, ts, t, h }` | Every telemetry message. |
 | `device_status` | `{ device, status }` | Device went online/offline. |
-| `alert` | `{ device, ts, kind, value, threshold }` | A violation lasted `holdMinutes`. |
+| `alert` | `{ device, ts, kind, value, threshold }` | A violation lasted `holdSeconds`. |
 | `alert_cleared` | `{ device, ts, kind }` | Value back in range. |
 
 ## MQTT contract

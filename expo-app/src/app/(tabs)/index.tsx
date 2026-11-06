@@ -96,8 +96,8 @@ export default function HomeScreen() {
             <Text style={styles.holdText}>
               Une valeur doit rester hors seuil pendant{' '}
               <Text style={styles.bold}>
-                {thresholds.holdMinutes} minute
-                {thresholds.holdMinutes > 1 ? 's' : ''}
+                {thresholds.holdSeconds} seconde
+                {thresholds.holdSeconds > 1 ? 's' : ''}
               </Text>{' '}
               avant le déclenchement.
             </Text>

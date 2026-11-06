@@ -195,7 +195,7 @@ export function useThresholds({
       await addJournalEntry(
         'thresholds',
         DEVICE_ID,
-        `Seuils synchronisés — délai ${saved.holdMinutes} min`,
+        `Seuils synchronisés — délai ${saved.holdSeconds} s`,
       );
       await refreshJournal();
       Alert.alert('Enregistré', 'Les seuils ont été mis à jour.');

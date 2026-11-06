@@ -92,11 +92,11 @@ export default function SettingsScreen() {
         <View style={styles.durationWrap}>
           <TextInput
             style={styles.durationInput}
-            value={thresholdForm.holdMinutes}
+            value={thresholdForm.holdSeconds}
             keyboardType="decimal-pad"
-            onChangeText={setField('holdMinutes')}
+            onChangeText={setField('holdSeconds')}
           />
-          <Text style={styles.durationUnit}>minutes</Text>
+          <Text style={styles.durationUnit}>secondes</Text>
         </View>
       </View>
 

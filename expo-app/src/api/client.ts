@@ -217,6 +217,29 @@ export async function fetchActiveAlerts(
   );
 }
 
+export async function registerPushToken(
+  apiUrl: string,
+  token: string,
+  platform: 'android' | 'ios',
+): Promise<void> {
+  await authedFetch(`${apiUrl}/notifications/push-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, platform }),
+  });
+}
+
+export async function unregisterPushToken(
+  apiUrl: string,
+  token: string,
+): Promise<void> {
+  await authedFetch(`${apiUrl}/notifications/push-token`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+}
+
 export async function putThresholds(
   apiUrl: string,
   deviceId: string,

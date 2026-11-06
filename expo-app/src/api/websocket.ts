@@ -80,6 +80,14 @@ export function createSentinelleSocket(
       }
 
       if (message.type === 'measurement') {
+        if (
+          !Number.isInteger(message.ts) ||
+          !Number.isFinite(message.t) ||
+          !Number.isFinite(message.h)
+        ) {
+          log('ws', 'invalid measurement frame');
+          return;
+        }
         cb.onMeasurement?.({
           ts: message.ts,
           t: message.t,

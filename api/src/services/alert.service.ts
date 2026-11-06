@@ -2,6 +2,7 @@ import { ThresholdsRepo } from "../db/repositories/thresholds.repo";
 import { EventsRepo } from "../db/repositories/events.repo";
 import { AlertStatesRepo } from "../db/repositories/alertStates.repo";
 import { wsManager } from "../ws/manager";
+import { sendAlertPush } from "./push.service";
 
 type ThresholdKind = "tMin" | "tMax" | "hMin" | "hMax";
 
@@ -112,7 +113,7 @@ export class AlertService {
       },
     ];
 
-    const holdSeconds = thresholds.holdMinutes * 60;
+    const holdSeconds = thresholds.holdSeconds;
 
     for (const check of checks) {
       const key = `${device}:${check.kind}`;
@@ -182,6 +183,14 @@ export class AlertService {
                 `[ALERT] FIRING with no WS clients connected: ${key}. Clients can resync via snapshot / GET active alerts.`,
               );
             }
+
+            void sendAlertPush(
+              "Alerte dans la chambre",
+              `${check.kind}: ${check.value} (seuil ${check.threshold})`,
+              { type: "alert", device, kind: check.kind },
+            ).catch((error) =>
+              console.error(`[ALERT] Push notification failed:`, error),
+            );
 
             this.eventsRepo.insert({
               device,

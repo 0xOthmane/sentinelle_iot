@@ -25,7 +25,7 @@ export interface Thresholds {
   tMax: number | null;
   hMin: number | null;
   hMax: number | null;
-  holdMinutes: number;
+  holdSeconds: number;
 }
 
 export interface MqttDataPayload {

@@ -20,7 +20,7 @@ thresholdsRoute.get("/:id/thresholds", (c) => {
       tMax: null,
       hMin: null,
       hMax: null,
-      holdMinutes: 1,
+      holdSeconds: 60,
     });
   }
 

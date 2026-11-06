@@ -19,6 +19,7 @@ import { authRoute } from "./routes/auth.route.js";
 import { wsTicketRoute } from "./routes/wsTicket.route.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { apiLimiter, loginLimiter } from "./middleware/rateLimit.js";
+import { notificationsRoute } from "./routes/notifications.route.js";
 
 const app = new Hono();
 
@@ -43,6 +44,9 @@ app.route("/devices", measurementsRoute);
 app.route("/devices", thresholdsRoute);
 app.route("/devices", commandsRoute);
 app.route("/devices", alertsRoute);
+app.use("/notifications/*", apiLimiter);
+app.use("/notifications/*", requireAuth);
+app.route("/notifications", notificationsRoute);
 
 app.use("/ws-ticket", apiLimiter);
 app.use("/ws-ticket", requireAuth);

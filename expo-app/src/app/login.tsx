@@ -35,9 +35,7 @@ export default function LoginScreen() {
             ? `Trop de tentatives — réessayez dans ${wait} s.`
             : 'Trop de tentatives — réessayez plus tard.',
         );
-      } else {
-        setError('Serveur injoignable — vérifiez la connexion.');
-      }
+      } 
     } finally {
       setBusy(false);
     }

@@ -42,6 +42,8 @@ Settings are `EXPO_PUBLIC_*` variables, **inlined into the bundle at build time*
 
 Restart `expo start` (with `--clear` if needed) after changing `.env`. **EAS cloud builds do not read your local `.env`** — define the variables in the EAS `preview` environment (see [../DEPLOYMENT.md](../DEPLOYMENT.md#4-build-and-install-the-android-app)).
 
+Background alerts use Expo push notifications. They require notifications permission, a configured Expo/EAS project, and an installable native build; Expo Go may not provide the required native module. The app registers the push token when notifications are enabled and removes it when they are disabled.
+
 `app.json` holds the app identity (`scheme: petit-nid`, Android package `iot.sentinelle.grp05`, EAS project id) and plugins. `eas.json` defines the build profiles: `development`, `preview` (installable APK, internal distribution) and `production`.
 
 ## Screens
@@ -82,7 +84,7 @@ Screens read two contexts through thin hooks; the logic lives in focused domain 
 | `useSentinelle` | Reads the main context (status, history, thresholds, alerts, journal, actions). |
 | `useSentinelleLive` | Reads the **live** context (latest `temperature`, `humidity`, 10-minute series). Separate so only screens that need it re-render on every sensor frame. |
 | `useSentinelleController` | Composes the hooks below and builds both context values. |
-| `useConnectivity` | App lifecycle: cache bootstrap, NetInfo / AppState / login-logout transitions, WebSocket connect & teardown. |
+| `useConnectivity` | App lifecycle: cache bootstrap, NetInfo / AppState / login-logout transitions, WebSocket connect, automatic retry after transient disconnects, and teardown. |
 | `useConnectionState` | `networkConnected` / `backendOnline` state plus refs for async callbacks. |
 | `useMeasurements` | Live + history series, range selection, cache fallbacks. |
 | `useThresholds` | Threshold form, save (online/offline), dirty replay, pushing defaults to an unconfigured server. |
@@ -95,7 +97,7 @@ Screens read two contexts through thin hooks; the logic lives in focused domain 
 ### Data flow
 
 1. **Start:** open SQLite → show cached data immediately → `refreshAll` (devices, live, history, thresholds, alerts) → open the WebSocket.
-2. **Live:** the socket asks `GET /ws-ticket`, connects, then streams `measurement`, `alert`, `alert_cleared`, `device_status` frames. Every frame is also cached.
+2. **Live:** the socket asks `GET /ws-ticket`, connects, then streams `measurement`, `alert`, `alert_cleared`, `device_status` frames. A transient socket failure is retried with backoff while the network is available. Every measurement frame is also cached.
 3. **Offline:** NetInfo flips `networkConnected`; screens show cached charts; LED commands and threshold edits are stored and replayed on reconnect or when the socket opens.
 4. **Session:** a `401` from any call clears the token and the router guard returns to `/login`.
 
