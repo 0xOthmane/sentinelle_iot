@@ -8,11 +8,18 @@ export type ConnectionState = {
   backendRef: RefObject<boolean>;
   setNetwork: (connected: boolean) => void;
   setBackend: (online: boolean) => void;
+  /** Human-readable socket lifecycle, shown in the Settings debug card. */
+  wsStatus: string;
+  /** Epoch ms of the last wsStatus change: exposes hangs in the UI. */
+  wsStatusSince: number;
+  setWsStatus: (status: string) => void;
 };
 
 export function useConnectionState(): ConnectionState {
   const [networkConnected, setNetworkConnected] = useState(true);
   const [backendOnline, setBackendOnline] = useState(false);
+  const [wsStatus, setWsStatusRaw] = useState('idle');
+  const [wsStatusSince, setWsStatusSince] = useState(() => Date.now());
   const networkRef = useRef(true);
   const backendRef = useRef(false);
 
@@ -26,6 +33,11 @@ export function useConnectionState(): ConnectionState {
     setBackendOnline(online);
   }, []);
 
+  const setWsStatus = useCallback((status: string) => {
+    setWsStatusRaw(status);
+    setWsStatusSince(Date.now());
+  }, []);
+
   return {
     networkConnected,
     backendOnline,
@@ -33,5 +45,8 @@ export function useConnectionState(): ConnectionState {
     backendRef,
     setNetwork,
     setBackend,
+    wsStatus,
+    wsStatusSince,
+    setWsStatus,
   };
 }

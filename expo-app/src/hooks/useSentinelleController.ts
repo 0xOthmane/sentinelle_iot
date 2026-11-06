@@ -30,7 +30,10 @@ import { useNotifications } from './useNotifications';
 import { useThresholds } from './useThresholds';
 
 /** Composes the domain hooks into the values exposed by SentinelleProvider. */
-export function useSentinelleController(authToken: string | null): {
+export function useSentinelleController(
+  authToken: string | null,
+  authReady: boolean,
+): {
   value: SentinelleContextValue;
   liveValue: SentinelleLiveValue;
 } {
@@ -150,11 +153,13 @@ export function useSentinelleController(authToken: string | null): {
     loadThresholds,
   ]);
 
-  useConnectivity({
+  const { forceReconnect } = useConnectivity({
     authToken,
+    authReady,
     connection,
     bootstrap,
     refreshAll,
+    pollLive: () => loadLiveMeasurements(),
     onReconnect: () => {
       void commands.flushCommandQueue();
       void thresholds.syncDirtyThresholds();
@@ -164,6 +169,10 @@ export function useSentinelleController(authToken: string | null): {
     },
     socketHandlers: {
       onOpen: async () => {
+        // Backfill the live window first: anything published while the
+        // socket was down (screen-off, tunnel drop) is restored here; WS
+        // frames dedupe against it via latestMeasurementTsRef.
+        await loadLiveMeasurements();
         await thresholds.syncDirtyThresholds();
         await commands.flushCommandQueue();
         // Snapshot may arrive a frame later; HTTP resync covers the case
@@ -186,6 +195,9 @@ export function useSentinelleController(authToken: string | null): {
       deviceStatus: device.deviceStatus,
       backendOnline: connection.backendOnline,
       networkConnected: connection.networkConnected,
+      wsStatus: connection.wsStatus,
+      wsStatusSince: connection.wsStatusSince,
+      forceWsReconnect: forceReconnect,
       ledOn: commands.ledOn,
       ledPending: commands.ledPending,
       historyLoading: measurements.historyLoading,
@@ -210,6 +222,9 @@ export function useSentinelleController(authToken: string | null): {
       device.deviceStatus,
       connection.backendOnline,
       connection.networkConnected,
+      connection.wsStatus,
+      connection.wsStatusSince,
+      forceReconnect,
       commands.ledOn,
       commands.ledPending,
       measurements.historyLoading,

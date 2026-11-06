@@ -26,7 +26,6 @@ Then scan the QR code with **Expo Go** (Android/iOS, version matching SDK 57). T
 
 Other useful checks: `npx tsc --noEmit` (types), `npx expo-doctor` (dependency/config problems), `npx expo install --fix` (align dependency versions with the SDK).
 
-> Expo Go only contains Expo's bundled native modules. Local notifications may be unavailable there; the app detects this and falls back to in-app alerts. For a full-featured build, create an installable APK with EAS — see [../DEPLOYMENT.md](../DEPLOYMENT.md).
 
 ## Configuration
 
@@ -34,13 +33,13 @@ Settings are `EXPO_PUBLIC_*` variables, **inlined into the bundle at build time*
 
 | Variable | Fallback | Description |
 |----------|----------|-------------|
-| `EXPO_PUBLIC_API_URL` | `http://10.22.57.36:3003` | API base URL, no trailing slash. Must be reachable from the phone; use the **https** tunnel URL for release/APK builds (Android blocks cleartext http). |
+| `EXPO_PUBLIC_API_URL` | `http://localhost:3003` | API base URL, no trailing slash. Must be reachable from the phone; use the **https** tunnel URL for release/APK builds (Android blocks cleartext http). |
 | `EXPO_PUBLIC_WS_URL` | API URL with `http`→`ws` + `/ws` | WebSocket URL. Normally leave unset. |
 | `EXPO_PUBLIC_DEVICE_ID` | `esp-05` | Sensor id; must match the MQTT topic. |
 | `EXPO_PUBLIC_GROUP_NAME` | `groupe5` | Sensor group; must match the MQTT topic. |
 | `EXPO_PUBLIC_APP_NAME` | `Petit Nid` | Title shown in the UI. |
 
-Restart `expo start` (with `--clear` if needed) after changing `.env`. **EAS cloud builds do not read your local `.env`** — define the variables in the EAS `preview` environment (see [../DEPLOYMENT.md](../DEPLOYMENT.md#4-build-and-install-the-android-app)).
+Restart `expo start` (with `--clear` if needed) after changing `.env`. **EAS cloud builds do not read your local `.env`** — define the variables in the EAS `preview` environment.
 
 Background alerts use Expo push notifications. They require notifications permission, a configured Expo/EAS project, and an installable native build; Expo Go may not provide the required native module. The app registers the push token when notifications are enabled and removes it when they are disabled.
 
@@ -96,7 +95,7 @@ Screens read two contexts through thin hooks; the logic lives in focused domain 
 
 ### Data flow
 
-1. **Start:** open SQLite → show cached data immediately → `refreshAll` (devices, live, history, thresholds, alerts) → open the WebSocket.
+1. **Start:** open SQLite → show cached data immediately → wait for SecureStore authentication hydration → `refreshAll` (devices, live, history, thresholds, alerts) → open the WebSocket only when a session token is available.
 2. **Live:** the socket asks `GET /ws-ticket`, connects, then streams `measurement`, `alert`, `alert_cleared`, `device_status` frames. A transient socket failure is retried with backoff while the network is available. Every measurement frame is also cached.
 3. **Offline:** NetInfo flips `networkConnected`; screens show cached charts; LED commands and threshold edits are stored and replayed on reconnect or when the socket opens.
 4. **Session:** a `401` from any call clears the token and the router guard returns to `/login`.
@@ -107,7 +106,7 @@ If the API reports a device as *unconfigured* (all-null bounds), the app saves i
 
 ## Testing
 
-There is no automated test suite yet. Static checks:
+Static checks:
 
 ```bash
 npx expo lint
@@ -115,15 +114,13 @@ npx tsc --noEmit
 npx expo-doctor
 ```
 
-For end-to-end manual testing (simulated sensor via MQTT, alert, night light, offline mode) follow [../DEPLOYMENT.md](../DEPLOYMENT.md#6-test-checklist).
-
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
 |---------|--------------------|
 | "Serveur injoignable" on login | `EXPO_PUBLIC_API_URL` wrong or not reachable from the phone; open it in the phone's browser (`/health`). |
 | Works in Expo Go, not in the APK | The APK was built without the env vars (cloud builds ignore `.env`) or uses `http://`. |
-| Stays on "Reconnexion" / "CACHE" | WebSocket not connecting: check the tunnel supports WebSockets and that the API log shows `[WS] Client connected`. |
+| Stays on "Reconnexion" / "CACHE" | Check the diagnostic status in Settings. It should progress through `token ok` → `ticket 200` → `open`; if it remains at `authentification…`, SecureStore hydration has not completed, and if `ticket…` never reaches the API, rebuild with the current client lifecycle code. Also check that the API log shows `[WS] Client connected`. |
 | Alerts never fire | Thresholds not saved on the server, or the sensor `ts` values are not advancing; see the checklist. |
 | Night light stays "waiting for confirmation" | Known limitation: the API does not acknowledge commands yet. |
 | Version warnings at startup | Run `npx expo install --fix` and rebuild the native app. |

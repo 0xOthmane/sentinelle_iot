@@ -15,6 +15,12 @@ export type SentinelleContextValue = {
   deviceStatus: 'online' | 'offline';
   backendOnline: boolean;
   networkConnected: boolean;
+  /** Socket lifecycle state ("open", "retry #2 in 4s", …) for diagnostics. */
+  wsStatus: string;
+  /** Epoch ms of the last wsStatus change; a stuck age = wedged attempt. */
+  wsStatusSince: number;
+  /** Kills the current attempt and starts a fresh one (probe success → UI). */
+  forceWsReconnect: () => void;
   ledOn: boolean;
   ledPending: boolean;
   historyLoading: boolean;

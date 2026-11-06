@@ -4,8 +4,8 @@ import { useSentinelleController } from '@/hooks/useSentinelleController';
 import { SentinelleContext, SentinelleLiveContext } from './SentinelleContext';
 
 export function SentinelleProvider({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
-  const { value, liveValue } = useSentinelleController(token);
+  const { token, isReady } = useAuth();
+  const { value, liveValue } = useSentinelleController(token, isReady);
 
   return (
     <SentinelleContext.Provider value={value}>

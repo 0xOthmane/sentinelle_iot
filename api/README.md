@@ -118,8 +118,6 @@ src/
 
 ## Testing manually
 
-See the full checklist in [../DEPLOYMENT.md](../DEPLOYMENT.md#6-test-checklist). In short:
-
 ```powershell
 # PowerShell
 $base = "http://localhost:3000"

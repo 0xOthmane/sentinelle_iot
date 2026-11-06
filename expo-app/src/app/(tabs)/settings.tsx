@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Button,
   Pressable,
@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { ScreenShell } from '@/components/ScreenShell';
 import { ScreenTitle, SettingInput } from '@/components/common';
+import { API_URL, DEVICE_ID, WS_URL } from '@/constants/config';
+import { probeWsConnection } from '@/api/wsProbe';
+import { getWsTraceLines } from '@/utils/wsTrace';
 import { useAuth } from '@/hooks/useAuth';
 import { useSentinelle } from '@/hooks/useSentinelle';
-import { resetDatabase } from '@/db/reset-db';
 import * as Sentry from '@sentry/react-native';
 
 export default function SettingsScreen() {
@@ -25,20 +27,45 @@ export default function SettingsScreen() {
     notificationsEnabled,
     toggleNotifications,
     saveThresholdSettings,
+    backendOnline,
+    networkConnected,
+    wsStatus,
+    wsStatusSince,
+    forceWsReconnect,
   } = useSentinelle();
+
+  // Ticks so the socket-status age stays live in the diagnostic card. The
+  // timestamp is sampled inside effects so the render stays pure.
+  const [nowTs, setNowTs] = useState(wsStatusSince);
+  const [trace, setTrace] = useState<string[]>([]);
+  useEffect(() => {
+    // First sample arrives with the first tick (≤1s): keeps effects clean.
+    const timer = setInterval(() => {
+      setNowTs(Date.now());
+      setTrace(getWsTraceLines());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const socketAge = Math.max(0, Math.round((nowTs - wsStatusSince) / 1000));
+
+  const [probeLines, setProbeLines] = useState<string[] | null>(null);
+  const [probeRunning, setProbeRunning] = useState(false);
+
+  const runProbe = useCallback(async () => {
+    setProbeRunning(true);
+    setProbeLines(null);
+    try {
+      const { lines } = await probeWsConnection(API_URL, WS_URL);
+      setProbeLines(lines);
+    } catch (error) {
+      setProbeLines([`probe: erreur inattendue — ${String(error)}`]);
+    } finally {
+      setProbeRunning(false);
+    }
+  }, []);
 
   const setField = (key: keyof typeof thresholdForm) => (value: string) =>
     setThresholdForm((old) => ({ ...old, [key]: value }));
-
-  // Wipe the local cache and drop the session: otherwise the next app launch
-  // re-downloads everything while still authenticated and the wipe is moot.
-  const handleReset = useCallback(async () => {
-    try {
-      await resetDatabase();
-    } finally {
-      await logout();
-    }
-  }, [logout]);
 
   return (
     <ScreenShell>
@@ -47,6 +74,59 @@ export default function SettingsScreen() {
         title="Seuils et alertes"
         subtitle="Adapte la surveillance de la chambre."
       />
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Diagnostic réseau</Text>
+        <Text style={styles.debugLine}>
+          réseau : {networkConnected ? 'connecté' : 'hors ligne'} ·
+          backend : {backendOnline ? 'connecté' : 'déconnecté'}
+        </Text>
+        <Text style={styles.debugLine}>
+          socket : {wsStatus} ({socketAge}s)
+        </Text>
+        <Text style={styles.debugLine} numberOfLines={1}>
+          device : {DEVICE_ID}
+        </Text>
+        <Text style={styles.debugLine} numberOfLines={1}>
+          api : {API_URL}
+        </Text>
+        <Text style={styles.debugLine} numberOfLines={1}>
+          ws : {WS_URL}
+        </Text>
+
+        {trace.length > 0 && (
+          <View style={styles.traceBlock}>
+            {trace.slice(0, 8).map((line, index) => (
+              <Text key={index} style={styles.probeLine}>
+                {line}
+              </Text>
+            ))}
+          </View>
+        )}
+
+        <Pressable
+          style={styles.probeButton}
+          onPress={() => void runProbe()}
+          disabled={probeRunning}
+        >
+          <Text style={styles.probeButtonText}>
+            {probeRunning ? 'Test en cours…' : 'Tester la connexion WS'}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.probeButton}
+          onPress={() => forceWsReconnect()}
+        >
+          <Text style={styles.probeButtonText}>
+            Forcer la reconnexion du socket
+          </Text>
+        </Pressable>
+        {probeLines?.map((line, index) => (
+          <Text key={index} style={styles.probeLine}>
+            {line}
+          </Text>
+        ))}
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Température</Text>
@@ -135,21 +215,7 @@ export default function SettingsScreen() {
           {thresholdLoading ? 'Enregistrement…' : 'Enregistrer les réglages'}
         </Text>
       </Pressable>
-      <Pressable
-        onPress={() => void handleReset()}
-        style={({ pressed }) => ({
-          backgroundColor: pressed ? '#991b1b' : '#dc2626',
-          padding: 16,
-          borderRadius: 10,
-          alignItems: 'center',
-          opacity: pressed ? 0.8 : 1,
-        })}
-      >
-        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>
-          Reset Database
-        </Text>
-      </Pressable>
-<Button title='Try!' onPress={ () => { Sentry.captureException(new Error('First error')) }}/>
+      {/* <Button title='Try!' onPress={ () => { Sentry.captureException(new Error('First error')) }}/> */}
       <Pressable style={styles.logoutButton} onPress={() => void logout()}>
         <Text style={styles.logoutButtonText}>Se déconnecter</Text>
       </Pressable>
@@ -171,6 +237,38 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 18,
     marginTop: 3,
+  },
+  debugLine: {
+    color: '#897C75',
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  probeButton: {
+    backgroundColor: '#EFF5F1',
+    borderWidth: 1,
+    borderColor: '#CBDCCF',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  probeButtonText: {
+    color: '#4A6C55',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  probeLine: {
+    color: '#6B5F58',
+    fontSize: 11,
+    lineHeight: 17,
+    marginTop: 5,
+  },
+  traceBlock: {
+    marginTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E5DAD4',
+    paddingTop: 6,
   },
   inputRow: {
     flexDirection: 'row',
