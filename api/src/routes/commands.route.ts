@@ -36,7 +36,7 @@ commandsRoute.post("/:id/commands", async (c) => {
     return c.json({ error: "Device not found" }, 404);
   }
 
-  const sent = publishCommand(device.group, deviceId, parsed.data);
+  const sent = await publishCommand(device.group, deviceId, parsed.data);
 
   const eventsRepo = new EventsRepo();
   eventsRepo.insert({
@@ -46,7 +46,7 @@ commandsRoute.post("/:id/commands", async (c) => {
     content: JSON.stringify(parsed.data),
   });
 
-  return c.json({ sent }, 202);
+  return c.json({ sent }, sent ? 202 : 503);
 });
 
 export { commandsRoute };

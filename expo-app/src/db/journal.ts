@@ -1,6 +1,7 @@
 import { getDatabase } from '@/db/database';
 import type { JournalItem } from '@/types';
-import { getAllCommands } from '@/db/commands';
+
+const MAX_JOURNAL_ROWS = 200;
 
 export async function addJournalEntry(
   type: string,
@@ -19,9 +20,24 @@ export async function addJournalEntry(
   );
 }
 
+/** The journal is read after almost every event: keep it bounded. */
+export async function pruneJournal(): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `DELETE FROM journal
+     WHERE id NOT IN (
+       SELECT id FROM journal ORDER BY id DESC LIMIT ?
+     )`,
+    MAX_JOURNAL_ROWS,
+  );
+}
+
 export async function listJournalItems(limit = 100): Promise<JournalItem[]> {
   const db = await getDatabase();
 
+  // Commands are journaled once when queued (with their reason); the queue
+  // rows themselves are not merged in, which used to list each command twice.
   const rows = await db.getAllAsync<{
     id: number;
     type: string;
@@ -30,27 +46,15 @@ export async function listJournalItems(limit = 100): Promise<JournalItem[]> {
   }>(
     `SELECT id, type, message, created_at
      FROM journal
-     ORDER BY created_at DESC
-     LIMIT 80`,
+     ORDER BY created_at DESC, id DESC
+     LIMIT ?`,
+    limit,
   );
 
-  const commands = await getAllCommands();
-
-  const local: JournalItem[] = rows.map((row) => ({
+  return rows.map((row) => ({
     id: `j-${row.id}`,
     type: row.type,
     message: row.message,
     createdAt: row.created_at,
   }));
-
-  const commandItems: JournalItem[] = commands.map((command) => ({
-    id: `c-${command.id}`,
-    type: 'command',
-    message: `Veilleuse ${command.led ? 'ON' : 'OFF'} · ${command.status} · ${command.attempts} tentative(s)`,
-    createdAt: command.createdAt,
-  }));
-
-  return [...local, ...commandItems]
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, limit);
 }

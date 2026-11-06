@@ -16,13 +16,35 @@
       "supportsTablet": true
     },
     "android": {
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "iot.sentinelle.grp05"
     },
     "plugins": [
       "expo-notifications",
       "expo-sqlite",
       "expo-router",
-      "expo-status-bar"
-    ]
+      "expo-status-bar",
+      "expo-secure-store",
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "none-er1"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6b375f1f-1c14-4a4b-a071-440504bd55ba"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6b375f1f-1c14-4a4b-a071-440504bd55ba"
+    }
   }
 }

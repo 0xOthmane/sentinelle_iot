@@ -13,21 +13,22 @@ export function parseThresholdForm(
     form.hMin.trim() === '' ? null : toNumber(form.hMin);
   const hMax =
     form.hMax.trim() === '' ? null : toNumber(form.hMax);
-  const holdMinutes = toNumber(form.holdMinutes);
+  const holdSeconds = toNumber(form.holdSeconds);
 
   if (
     !Number.isFinite(tMin) ||
     !Number.isFinite(tMax) ||
     tMin >= tMax ||
-    !Number.isFinite(holdMinutes) ||
-    holdMinutes < 1 ||
-    holdMinutes > 120
+    !Number.isFinite(holdSeconds) ||
+    !Number.isInteger(holdSeconds) ||
+    holdSeconds < 1 ||
+    holdSeconds > 7200
   ) {
     return {
       error: {
         title: 'Seuils invalides',
         message:
-          'Température : min < max. Durée : entre 1 et 120 minutes.',
+          'Température : min < max. Durée : entre 1 et 7200 secondes.',
       },
     };
   }
@@ -52,7 +53,7 @@ export function parseThresholdForm(
       tMax,
       hMin,
       hMax,
-      holdMinutes: Math.round(holdMinutes),
+      holdSeconds,
     },
   };
 }
@@ -63,6 +64,6 @@ export function thresholdsToForm(value: Thresholds): ThresholdForm {
     tMax: String(value.tMax),
     hMin: value.hMin == null ? '' : String(value.hMin),
     hMax: value.hMax == null ? '' : String(value.hMax),
-    holdMinutes: String(value.holdMinutes),
+    holdSeconds: String(value.holdSeconds),
   };
 }

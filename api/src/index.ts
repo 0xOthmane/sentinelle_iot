@@ -14,6 +14,12 @@ import { devicesRoute } from "./routes/devices.route.js";
 import { measurementsRoute } from "./routes/measurements.route.js";
 import { thresholdsRoute } from "./routes/thresholds.route.js";
 import { commandsRoute } from "./routes/commands.route.js";
+import { alertsRoute } from "./routes/alerts.route.js";
+import { authRoute } from "./routes/auth.route.js";
+import { wsTicketRoute } from "./routes/wsTicket.route.js";
+import { requireAuth } from "./middleware/requireAuth.js";
+import { apiLimiter, loginLimiter } from "./middleware/rateLimit.js";
+import { notificationsRoute } from "./routes/notifications.route.js";
 
 const app = new Hono();
 
@@ -28,10 +34,23 @@ app.get("/health", (c) => {
   });
 });
 
+app.use("/auth/login", loginLimiter);
+app.route("/auth", authRoute);
+
+app.use("/devices/*", apiLimiter);
+app.use("/devices/*", requireAuth);
 app.route("/devices", devicesRoute);
 app.route("/devices", measurementsRoute);
 app.route("/devices", thresholdsRoute);
 app.route("/devices", commandsRoute);
+app.route("/devices", alertsRoute);
+app.use("/notifications/*", apiLimiter);
+app.use("/notifications/*", requireAuth);
+app.route("/notifications", notificationsRoute);
+
+app.use("/ws-ticket", apiLimiter);
+app.use("/ws-ticket", requireAuth);
+app.route("/ws-ticket", wsTicketRoute);
 
 const { injectWebSocket } = setupWebSocket(app);
 

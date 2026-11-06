@@ -53,24 +53,54 @@ export async function getAllCommands(): Promise<QueuedCommand[]> {
   const rows = await db.getAllAsync<CommandRow>(
     `SELECT id, device, led, status, attempts, created_at
      FROM command_queue
-     ORDER BY created_at DESC`,
+     ORDER BY created_at DESC, rowid DESC`,
   );
 
   return rows.map(toCommand);
 }
 
-/** Commands that still need a (re)send, oldest first. */
-export async function getReplayableCommands(): Promise<QueuedCommand[]> {
+/**
+ * The command to (re)send on reconnect: only the newest pending one. Older
+ * pending commands are superseded (the LED only needs its latest target
+ * state) and marked failed so they are never replayed.
+ */
+export async function takeLatestPendingCommand(): Promise<QueuedCommand | null> {
   const db = await getDatabase();
 
   const rows = await db.getAllAsync<CommandRow>(
     `SELECT id, device, led, status, attempts, created_at
      FROM command_queue
-     WHERE status IN ('pending', 'sent')
-     ORDER BY created_at ASC`,
+     WHERE status = 'pending'
+     ORDER BY created_at DESC, rowid DESC`,
   );
+  if (!rows.length) return null;
 
-  return rows.map(toCommand);
+  const [latest, ...superseded] = rows;
+  for (const row of superseded) {
+    await db.runAsync(
+      `UPDATE command_queue SET status = 'failed' WHERE id = ?`,
+      row.id,
+    );
+  }
+  return toCommand(latest);
+}
+
+const MAX_QUEUE_ROWS = 100;
+
+/** Keeps the queue (read on every journal refresh) from growing forever. */
+export async function pruneCommands(): Promise<void> {
+  const db = await getDatabase();
+
+  await db.runAsync(
+    `DELETE FROM command_queue
+     WHERE status != 'pending'
+       AND id NOT IN (
+         SELECT id FROM command_queue
+         ORDER BY created_at DESC, rowid DESC
+         LIMIT ?
+       )`,
+    MAX_QUEUE_ROWS,
+  );
 }
 
 export async function updateCommandStatus(

@@ -15,29 +15,28 @@ import { StateCard } from '@/components/StateCard';
 import { ThresholdSummary } from '@/components/common';
 import { usePulse } from '@/hooks/usePulse';
 import { useRoomState } from '@/hooks/useRoomState';
-import { useSentinelle } from '@/state/SentinelleProvider';
+import { useSentinelle } from '@/hooks/useSentinelle';
+import { useSentinelleLive } from '@/hooks/useSentinelleLive';
 
 export default function HomeScreen() {
   const {
-    temperature,
-    humidity,
-    liveMeasurements,
     thresholds,
     activeAlert,
     backendOnline,
     networkConnected,
     ledOn,
     ledPending,
-    liveLoading,
     toggleLed,
   } = useSentinelle();
+  const { temperature, humidity, liveMeasurements, liveLoading } =
+    useSentinelleLive();
 
-  const roomState = useRoomState(
+  const roomState = useRoomState({
     activeAlert,
     temperature,
     humidity,
     thresholds,
-  );
+  });
   const pulse = usePulse(activeAlert != null);
 
   return (
@@ -97,8 +96,8 @@ export default function HomeScreen() {
             <Text style={styles.holdText}>
               Une valeur doit rester hors seuil pendant{' '}
               <Text style={styles.bold}>
-                {thresholds.holdMinutes} minute
-                {thresholds.holdMinutes > 1 ? 's' : ''}
+                {thresholds.holdSeconds} seconde
+                {thresholds.holdSeconds > 1 ? 's' : ''}
               </Text>{' '}
               avant le déclenchement.
             </Text>

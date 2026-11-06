@@ -6,7 +6,7 @@ type ThresholdsRow = {
   t_max: number;
   h_min: number | null;
   h_max: number | null;
-  hold_minutes: number;
+  hold_seconds: number;
   dirty: number;
 };
 
@@ -19,14 +19,14 @@ export async function saveThresholdsToCache(
 
   await db.runAsync(
     `INSERT OR REPLACE INTO thresholds_cache
-     (device, t_min, t_max, h_min, h_max, hold_minutes, dirty, cached_at)
+     (device, t_min, t_max, h_min, h_max, hold_seconds, dirty, cached_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     device,
     value.tMin,
     value.tMax,
     value.hMin,
     value.hMax,
-    value.holdMinutes,
+    value.holdSeconds,
     dirty ? 1 : 0,
     Math.floor(Date.now() / 1000),
   );
@@ -38,7 +38,7 @@ export async function loadCachedThresholds(
   const db = await getDatabase();
 
   const row = await db.getFirstAsync<ThresholdsRow>(
-    `SELECT t_min, t_max, h_min, h_max, hold_minutes, dirty
+    `SELECT t_min, t_max, h_min, h_max, hold_seconds, dirty
      FROM thresholds_cache WHERE device = ?`,
     device,
   );
@@ -51,7 +51,7 @@ export async function loadCachedThresholds(
       tMax: row.t_max,
       hMin: row.h_min,
       hMax: row.h_max,
-      holdMinutes: row.hold_minutes,
+      holdSeconds: row.hold_seconds,
     },
     dirty: row.dirty === 1,
   };
@@ -67,9 +67,9 @@ export async function loadDirtyThresholds(
     t_max: number;
     h_min: number | null;
     h_max: number | null;
-    hold_minutes: number;
+    hold_seconds: number;
   }>(
-    `SELECT t_min, t_max, h_min, h_max, hold_minutes
+    `SELECT t_min, t_max, h_min, h_max, hold_seconds
      FROM thresholds_cache
      WHERE device = ? AND dirty = 1`,
     device,
@@ -82,6 +82,6 @@ export async function loadDirtyThresholds(
     tMax: row.t_max,
     hMin: row.h_min,
     hMax: row.h_max,
-    holdMinutes: row.hold_minutes,
+    holdSeconds: row.hold_seconds,
   };
 }

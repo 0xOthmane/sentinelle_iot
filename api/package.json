@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-   "scripts": {
+  "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
@@ -19,6 +19,7 @@
     "better-sqlite3": "^13.0.3",
     "dotenv": "^18.0.3",
     "hono": "^4.13.9",
+    "hono-rate-limiter": "^0.5.4",
     "mqtt": "^5.16.0",
     "zod": "^4.6.5"
   },

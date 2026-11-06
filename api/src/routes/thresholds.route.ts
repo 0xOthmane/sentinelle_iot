@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { DevicesRepo } from "../db/repositories/devices.repo";
 import { ThresholdsRepo } from "../db/repositories/thresholds.repo";
 import { thresholdsSchema } from "../utils/validation";
 
@@ -11,13 +12,15 @@ thresholdsRoute.get("/:id/thresholds", (c) => {
 
   const thresholds = repo.findByDevice(deviceId);
 
+  // No row yet: all-null bounds tell the app the device is unconfigured
+  // (no alerting); it then pushes its defaults via PUT.
   if (!thresholds) {
     return c.json({
       tMin: null,
       tMax: null,
       hMin: null,
       hMax: null,
-      holdMinutes: 10,
+      holdSeconds: 60,
     });
   }
 
@@ -45,6 +48,12 @@ thresholdsRoute.put("/:id/thresholds", async (c) => {
       },
       400,
     );
+  }
+
+  // thresholds.device references devices(id): an unknown device would fail
+  // with a foreign-key error (500) instead of a clear client error.
+  if (!new DevicesRepo().findById(deviceId)) {
+    return c.json({ error: "Device not found" }, 404);
   }
 
   const repo = new ThresholdsRepo();

@@ -2,12 +2,17 @@ import { useMemo } from 'react';
 import type { AlertEvent, RoomState, Thresholds } from '@/types';
 import { describeAlert } from '@/utils/format';
 
-export function useRoomState(
-  activeAlert: AlertEvent | null,
-  temperature: number | null,
-  humidity: number | null,
-  thresholds: Thresholds,
-): RoomState {
+export function useRoomState({
+  activeAlert,
+  temperature,
+  humidity,
+  thresholds,
+}: {
+  activeAlert: AlertEvent | null;
+  temperature: number | null;
+  humidity: number | null;
+  thresholds: Thresholds;
+}): RoomState {
   return useMemo<RoomState>(() => {
     if (activeAlert) {
       return {
@@ -36,7 +41,7 @@ export function useRoomState(
       return {
         kind: 'warning',
         title: 'À surveiller',
-        text: `Hors seuil — alerte après ${thresholds.holdMinutes} min`,
+        text: `Hors seuil — alerte après ${thresholds.holdSeconds} s`,
       };
     }
 

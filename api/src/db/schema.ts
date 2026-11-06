@@ -33,7 +33,7 @@ export function initializeSchema(db: Database.Database): void {
       t_max         REAL,
       h_min         REAL,
       h_max         REAL,
-      hold_minutes  INTEGER NOT NULL DEFAULT 10
+      hold_seconds  INTEGER NOT NULL DEFAULT 60
     );
 
     CREATE TABLE IF NOT EXISTS events (
@@ -47,5 +47,58 @@ export function initializeSchema(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_events_device_ts
       ON events(device, ts);
+
+    -- Durable alert/violation state so a missed WS frame or an API
+    -- restart doesn't lose active alerts or in-progress hold windows.
+    CREATE TABLE IF NOT EXISTS alert_states (
+      device              TEXT NOT NULL REFERENCES devices(id),
+      kind                TEXT NOT NULL,
+      first_violation_ts  INTEGER NOT NULL,
+      alerted             INTEGER NOT NULL DEFAULT 0
+                          CHECK(alerted IN (0,1)),
+      value               REAL,
+      threshold           REAL,
+      updated_ts          INTEGER NOT NULL,
+      PRIMARY KEY (device, kind)
+    );
+
+    CREATE TABLE IF NOT EXISTS push_tokens (
+      token       TEXT PRIMARY KEY,
+      platform    TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
+
+  const thresholdColumns = db
+    .prepare(`PRAGMA table_info(thresholds)`)
+    .all() as Array<{ name: string }>;
+  if (!thresholdColumns.some((column) => column.name === "hold_seconds")) {
+    db.exec(`ALTER TABLE thresholds ADD COLUMN hold_seconds INTEGER NOT NULL DEFAULT 60`);
+    if (thresholdColumns.some((column) => column.name === "hold_minutes")) {
+      db.exec(`UPDATE thresholds SET hold_seconds = hold_minutes * 60`);
+    }
+  }
+
+  // UNIQUE(device, ts, seq) never matches when seq is NULL (NULLs are
+  // distinct in SQLite), so QoS-1 redeliveries were stored twice. Remove
+  // existing duplicates once, then enforce uniqueness with seq coalesced.
+  const hasDedupeIndex = db
+    .prepare(
+      `SELECT 1 FROM sqlite_master
+       WHERE type = 'index' AND name = 'idx_measurements_dedupe'`,
+    )
+    .get();
+  if (!hasDedupeIndex) {
+    db.transaction(() => {
+      db.exec(`
+        DELETE FROM measurements
+        WHERE id NOT IN (
+          SELECT MIN(id) FROM measurements
+          GROUP BY device, ts, IFNULL(seq, -1)
+        );
+        CREATE UNIQUE INDEX idx_measurements_dedupe
+          ON measurements(device, ts, IFNULL(seq, -1));
+      `);
+    })();
+  }
 }

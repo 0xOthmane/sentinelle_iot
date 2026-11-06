@@ -30,8 +30,8 @@ export function LedCard({
             {ledPending
               ? !networkConnected
                 ? 'Commande enregistrée — attente du réseau'
-                : 'Commande envoyée — attente de confirmation'
-              : 'État confirmé par le boîtier'}
+                : 'Commande en cours d’envoi'
+              : 'Commande transmise au boîtier'}
           </Text>
         </View>
 
