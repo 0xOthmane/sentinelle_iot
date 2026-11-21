@@ -7,12 +7,9 @@ let notifications: Notifications | undefined;
 export function getNotifications(): Notifications | null {
   if (Platform.OS !== 'android' && Platform.OS !== 'ios') return null;
 
-  // SDK 57's notifications entry point eagerly loads this Android module,
-  // which may be absent from Expo Go or a development build made before upgrading.
-  if (
-    Platform.OS === 'android' &&
-    !requireOptionalNativeModule('ExpoTopicSubscriptionModule')
-  ) {
+  // Check the push-token native module specifically. The topic-subscription
+  // module is optional and is unrelated to notification availability.
+  if (!requireOptionalNativeModule('ExpoPushTokenManager')) {
     return null;
   }
 

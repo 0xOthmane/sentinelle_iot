@@ -41,9 +41,33 @@ Settings are `EXPO_PUBLIC_*` variables, **inlined into the bundle at build time*
 
 Restart `expo start` (with `--clear` if needed) after changing `.env`. **EAS cloud builds do not read your local `.env`** — define the variables in the EAS `preview` environment.
 
-Background alerts use Expo push notifications. They require notifications permission, a configured Expo/EAS project, and an installable native build; Expo Go may not provide the required native module. The app registers the push token when notifications are enabled and removes it when they are disabled.
+Background alerts use Expo push notifications. They require notifications permission, a configured Expo/EAS project, and an installable native build; Expo Go may not provide the required native module. The app registers the push token and the `expo-task-manager` background task when notifications are enabled, and removes the push token when they are disabled. The background task is best-effort; Expo push delivery remains the primary mechanism.
 
-`app.json` holds the app identity (`scheme: petit-nid`, Android package `iot.sentinelle.grp05`, EAS project id) and plugins. `eas.json` defines the build profiles: `development`, `preview` (installable APK, internal distribution) and `production`.
+Android push tokens also require Firebase Cloud Messaging. Create a Firebase
+Android app with package `iot.sentinelle.grp05`, download `google-services.json`,
+and configure it as an **EAS file environment variable** named
+`GOOGLE_SERVICES_JSON` for the build environment. The dynamic Expo config maps
+that file into `android.googleServicesFile`; the credential file is ignored and
+must not be committed. Configure the Firebase service-account key for FCM V1
+through EAS Credentials as well.
+
+After configuring both credentials, rebuild the APK:
+
+```bash
+npx eas-cli build --platform android --profile preview
+```
+
+Changing Firebase or EAS credentials does not update an already-installed APK.
+If the app still reports `Unable to get Firebase Messaging instance`, inspect
+the resolved build configuration and confirm that the Firebase Android package
+is exactly `iot.sentinelle.grp05`.
+
+If enabling notifications fails, the dialog now includes the failing stage or
+HTTP status. Check that the APK was rebuilt after native dependency changes,
+that `extra.eas.projectId` belongs to the EAS project used for the build, and
+that `EXPO_PUBLIC_API_URL` points to the currently deployed API.
+
+`app.config.js` holds the app identity (`scheme: petit-nid`, Android package `iot.sentinelle.grp05`, EAS project id), plugins, and the optional EAS-provided Firebase file. `eas.json` defines the build profiles: `development`, `preview` (installable APK, internal distribution) and `production`.
 
 ## Screens
 

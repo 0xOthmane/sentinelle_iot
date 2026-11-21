@@ -29,8 +29,8 @@ export class RateLimitError extends Error {
 /** Non-2xx answer from the API (the server was reached). */
 export class HttpError extends Error {
   status: number;
-  constructor(status: number) {
-    super(`HTTP ${status}`);
+  constructor(status: number, detail?: string) {
+    super(detail ? `HTTP ${status}: ${detail}` : `HTTP ${status}`);
     this.name = 'HttpError';
     this.status = status;
   }
@@ -111,7 +111,10 @@ async function authedFetch(url: string, init?: RequestInit): Promise<Response> {
       parseRetryAfter(response.headers.get('Retry-After')),
     );
   }
-  if (!response.ok) throw new HttpError(response.status);
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new HttpError(response.status, detail.slice(0, 240));
+  }
   return response;
 }
 

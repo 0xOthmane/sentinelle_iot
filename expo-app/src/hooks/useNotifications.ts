@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as TaskManager from 'expo-task-manager';
 import { API_URL } from '@/constants/config';
 import { registerPushToken, unregisterPushToken } from '@/api/client';
 import { saveNotificationsEnabled } from '@/db/settingsStore';
+import {
+  BACKGROUND_NOTIFICATION_TASK,
+} from '@/utils/backgroundNotifications';
 import { getNotifications } from '@/utils/notifications';
 
 export function useNotifications() {
@@ -15,9 +19,9 @@ export function useNotifications() {
   const registerDevice = useCallback(async () => {
     const Notifications = getNotifications();
     if (!Notifications) return false;
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId as
-      | string
-      | undefined;
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
     if (!projectId) {
       throw new Error('Expo project ID is missing');
     }
@@ -29,6 +33,9 @@ export function useNotifications() {
       });
     }
     const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    if (!(await TaskManager.isTaskRegisteredAsync(BACKGROUND_NOTIFICATION_TASK))) {
+      await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
+    }
     await registerPushToken(
       API_URL,
       token,
@@ -106,10 +113,14 @@ export function useNotifications() {
     } catch (error) {
       setNotificationsEnabled(false);
       await saveNotificationsEnabled(false);
+      const rawDetail = error instanceof Error ? error.message : String(error);
+      const detail = rawDetail.includes('Firebase Messaging')
+        ? `${rawDetail} Vérifiez la configuration Firebase Android (google-services.json et FCM V1 dans EAS).`
+        : rawDetail;
       console.warn('[NOTIFICATIONS] Push token registration failed', error);
       Alert.alert(
         'Notifications indisponibles',
-        'Le jeton de notification n’a pas pu être enregistré auprès du serveur.',
+        `Échec de l’enregistrement : ${detail}`,
       );
       return;
     }
