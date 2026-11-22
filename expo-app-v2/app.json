@@ -38,7 +38,8 @@
           "project": "react-native",
           "organization": "none-er1"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

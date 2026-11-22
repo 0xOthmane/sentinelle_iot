@@ -2,6 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 
 import AppTabs from '@/components/app-tabs';
 import { SENTRY_DSN } from '@/constants/config';
+import { ApiProvider } from '@/api';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import * as Sentry from '@sentry/react-native';
 
@@ -28,9 +29,11 @@ Sentry.init({
 function TabLayout() {
   const colorScheme = useColorScheme();
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AppTabs />
-    </ThemeProvider>
+    <ApiProvider>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <AppTabs />
+      </ThemeProvider>
+    </ApiProvider>
   );
 }
 
