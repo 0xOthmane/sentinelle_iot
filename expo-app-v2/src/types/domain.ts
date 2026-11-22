@@ -16,8 +16,12 @@ export type JournalItem = {
 export type RoomState =
   | { kind: 'alert'; title: string; text: string }
   | { kind: 'warning'; title: string; text: string }
-  | { kind: 'neutral'; title: string; text: string }
+  | { kind: 'calm'; title: string; text: string }
   | { kind: 'good'; title: string; text: string };
+
+export type LiveConnectionState = 'idle' | 'connecting' | 'open' | 'reconnecting';
+
+export type LiveDeviceStatus = 'unknown' | 'online' | 'offline';
 
 export type HistoryStats = {
   tMin: number;

@@ -1,4 +1,4 @@
-import { StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -19,10 +19,12 @@ export function StateCard({
   kind,
   title,
   text,
+  onAcknowledge,
 }: {
   kind: RoomStateKind;
   title: string;
   text: string;
+  onAcknowledge?: () => void;
 }) {
   const colors = useSentinelColors();
   const theme = useTheme();
@@ -44,6 +46,24 @@ export function StateCard({
         <ThemedText type="small" themeColor="textSecondary" style={styles.body}>
           {text}
         </ThemedText>
+        {kind === 'alert' && onAcknowledge ? (
+          <Pressable
+            accessibilityRole="button"
+            style={[
+              styles.acknowledgeButton,
+              {
+                backgroundColor: colors.accentSoft,
+                borderColor: colors.accent,
+              },
+            ]}
+            onPress={onAcknowledge}>
+            <ThemedText
+              type="smallBold"
+              style={[styles.acknowledgeButtonText, { color: colors.accentText }]}>
+              Acquitter l’alerte
+            </ThemedText>
+          </Pressable>
+        ) : null}
       </ThemedView>
     </ThemedView>
   );
@@ -75,5 +95,15 @@ const styles = StyleSheet.create({
   },
   body: {
     marginTop: Spacing.half,
+  },
+  acknowledgeButton: {
+    marginTop: Spacing.two,
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  acknowledgeButtonText: {
+    fontSize: 12,
   },
 });

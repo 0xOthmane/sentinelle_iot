@@ -16,7 +16,7 @@ import { useSentinelColors } from '@/constants/sentinel-theme';
 import { Spacing } from '@/constants/theme';
 
 export type ChartPoint = {
-  /** Timestamp in milliseconds, or a sequential index. */
+  /** Timestamp in seconds, or a sequential index. */
   x: number;
   /** Measured value. */
   y: number;
@@ -25,6 +25,9 @@ export type ChartPoint = {
 const PADDING_X = 14;
 const PADDING_Y = 26;
 const DEFAULT_HEIGHT = 190;
+const X_AXIS_HEIGHT = 18;
+
+const defaultFormatX = (value: number) => String(Math.round(value));
 
 export function SoftChart({
   data,
@@ -32,12 +35,19 @@ export function SoftChart({
   minThreshold,
   maxThreshold,
   height = DEFAULT_HEIGHT,
+  xDomain,
+  xTickCount = 3,
+  formatX = defaultFormatX,
 }: {
   data: ChartPoint[];
   unit: string;
   minThreshold: number | null;
   maxThreshold: number | null;
   height?: number;
+  /** When set, points are scaled by their x value instead of their index. */
+  xDomain?: readonly [number, number];
+  xTickCount?: number;
+  formatX?: (value: number) => string;
 }) {
   const colors = useSentinelColors();
   const [width, setWidth] = useState(0);
@@ -61,15 +71,29 @@ export function SoftChart({
     const plotHeight = height - PADDING_Y * 2;
     const baseline = height - PADDING_Y;
 
-    const xFor = (index: number) =>
-      PADDING_X + (index / Math.max(data.length - 1, 1)) * plotWidth;
+    const hasXDomain =
+      xDomain !== undefined &&
+      Number.isFinite(xDomain[0]) &&
+      Number.isFinite(xDomain[1]) &&
+      xDomain[1] > xDomain[0];
+    const xMin = hasXDomain ? xDomain[0] : 0;
+    const xMax = hasXDomain
+      ? xDomain[1]
+      : Math.max(data.length - 1, 1);
+    const xRange = xMax - xMin || 1;
+    const xFor = (value: number) => {
+      const clamped = hasXDomain
+        ? Math.min(Math.max(value, xMin), xMax)
+        : value;
+      return PADDING_X + ((clamped - xMin) / xRange) * plotWidth;
+    };
     const yFor = (value: number) => baseline - ((value - min) / range) * plotHeight;
 
     const lineBuilder = Skia.PathBuilder.Make();
     const areaBuilder = Skia.PathBuilder.Make();
 
     data.forEach((point, index) => {
-      const x = xFor(index);
+      const x = xFor(point.x);
       const y = yFor(point.y);
       if (index === 0) {
         lineBuilder.moveTo(x, y);
@@ -81,8 +105,16 @@ export function SoftChart({
       }
     });
 
-    areaBuilder.lineTo(xFor(data.length - 1), baseline);
+    areaBuilder.lineTo(xFor(data[data.length - 1].x), baseline);
     areaBuilder.close();
+
+    const tickCount = Math.max(2, Math.floor(xTickCount));
+    const ticks = hasXDomain
+      ? Array.from({ length: tickCount }, (_, index) => {
+          const value = xMin + ((xMax - xMin) * index) / (tickCount - 1);
+          return { value, x: xFor(value) };
+        })
+      : [];
 
     return {
       linePath: lineBuilder.build(),
@@ -93,8 +125,18 @@ export function SoftChart({
       minY: minThreshold != null ? yFor(minThreshold) : null,
       maxY: maxThreshold != null ? yFor(maxThreshold) : null,
       gridYs: [0, 1, 2, 3].map((index) => PADDING_Y + (index * plotHeight) / 3),
+      ticks,
+      baseline,
     };
-  }, [data, width, height, minThreshold, maxThreshold]);
+  }, [
+    data,
+    width,
+    height,
+    minThreshold,
+    maxThreshold,
+    xDomain,
+    xTickCount,
+  ]);
 
   if (data.length < 2) {
     return (
@@ -107,75 +149,104 @@ export function SoftChart({
   }
 
   return (
-    <ThemedView
-      type="backgroundElement"
-      style={{ height }}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
-      {chart && (
-        <>
-          <Canvas style={StyleSheet.absoluteFill}>
-            {chart.gridYs.map((y, index) => (
-              <Line
-                key={`grid-${index}`}
-                p1={vec(PADDING_X, y)}
-                p2={vec(width - PADDING_X, y)}
-                color={colors.border}
-                strokeWidth={1}
+    <ThemedView type="backgroundElement">
+      <ThemedView
+        type="backgroundElement"
+        style={{ height }}
+        onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+        {chart && (
+          <>
+            <Canvas style={StyleSheet.absoluteFill}>
+              {chart.gridYs.map((y, index) => (
+                <Line
+                  key={`grid-${index}`}
+                  p1={vec(PADDING_X, y)}
+                  p2={vec(width - PADDING_X, y)}
+                  color={colors.border}
+                  strokeWidth={1}
+                />
+              ))}
+
+              {chart.ticks.map((tick, index) => (
+                <Line
+                  key={`x-grid-${index}`}
+                  p1={vec(tick.x, PADDING_Y)}
+                  p2={vec(tick.x, chart.baseline)}
+                  color={`${colors.border}80`}
+                  strokeWidth={1}
+                />
+              ))}
+
+              {chart.minY != null && (
+                <Line
+                  p1={vec(PADDING_X, chart.minY)}
+                  p2={vec(width - PADDING_X, chart.minY)}
+                  color={colors.muted}
+                  strokeWidth={1}>
+                  <DashPathEffect intervals={[4, 4]} />
+                </Line>
+              )}
+
+              {chart.maxY != null && (
+                <Line
+                  p1={vec(PADDING_X, chart.maxY)}
+                  p2={vec(width - PADDING_X, chart.maxY)}
+                  color={colors.muted}
+                  strokeWidth={1}>
+                  <DashPathEffect intervals={[4, 4]} />
+                </Line>
+              )}
+
+              <Path path={chart.areaPath} style="fill">
+                <LinearGradient
+                  start={vec(0, PADDING_Y)}
+                  end={vec(0, height - PADDING_Y)}
+                  colors={[`${colors.accent}33`, `${colors.accent}00`]}
+                />
+              </Path>
+
+              <Path
+                path={chart.linePath}
+                style="stroke"
+                color={colors.accent}
+                strokeWidth={3}
+                strokeCap="round"
+                strokeJoin="round"
               />
-            ))}
+            </Canvas>
 
-            {chart.minY != null && (
-              <Line
-                p1={vec(PADDING_X, chart.minY)}
-                p2={vec(width - PADDING_X, chart.minY)}
-                color={colors.muted}
-                strokeWidth={1}>
-                <DashPathEffect intervals={[4, 4]} />
-              </Line>
-            )}
-
-            {chart.maxY != null && (
-              <Line
-                p1={vec(PADDING_X, chart.maxY)}
-                p2={vec(width - PADDING_X, chart.maxY)}
-                color={colors.muted}
-                strokeWidth={1}>
-                <DashPathEffect intervals={[4, 4]} />
-              </Line>
-            )}
-
-            <Path path={chart.areaPath} style="fill">
-              <LinearGradient
-                start={vec(0, PADDING_Y)}
-                end={vec(0, height - PADDING_Y)}
-                colors={[`${colors.accent}33`, `${colors.accent}00`]}
-              />
-            </Path>
-
-            <Path
-              path={chart.linePath}
-              style="stroke"
-              color={colors.accent}
-              strokeWidth={3}
-              strokeCap="round"
-              strokeJoin="round"
-            />
-          </Canvas>
-
-          <ThemedView style={styles.labels} pointerEvents="none">
-            <ThemedView style={styles.labelRow}>
+            <ThemedView style={styles.labels} pointerEvents="none">
+              <ThemedView style={styles.labelRow}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
+                  {chart.max.toFixed(1)} {unit}
+                </ThemedText>
+                <ThemedText type="smallBold" style={styles.label}>
+                  {chart.last.toFixed(1)} {unit}
+                </ThemedText>
+              </ThemedView>
               <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-                {chart.max.toFixed(1)} {unit}
-              </ThemedText>
-              <ThemedText type="smallBold" style={styles.label}>
-                {chart.last.toFixed(1)} {unit}
+                {chart.min.toFixed(1)} {unit}
               </ThemedText>
             </ThemedView>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
-              {chart.min.toFixed(1)} {unit}
+          </>
+        )}
+      </ThemedView>
+
+      {chart && chart.ticks.length > 0 && (
+        <ThemedView
+          type="backgroundElement"
+          style={styles.axisRow}
+          pointerEvents="none">
+          {chart.ticks.map((tick, index) => (
+            <ThemedText
+              key={`x-label-${index}`}
+              type="small"
+              themeColor="textSecondary"
+              style={styles.axisLabel}>
+              {formatX(tick.value)}
             </ThemedText>
-          </ThemedView>
-        </>
+          ))}
+        </ThemedView>
       )}
     </ThemedView>
   );
@@ -202,5 +273,16 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     lineHeight: 15,
+  },
+  axisRow: {
+    height: X_AXIS_HEIGHT,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: PADDING_X,
+  },
+  axisLabel: {
+    fontSize: 10,
+    lineHeight: 14,
   },
 });

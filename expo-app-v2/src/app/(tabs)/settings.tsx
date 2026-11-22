@@ -1,7 +1,17 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Switch, TextInput } from 'react-native';
+import { Controller, useForm } from 'react-hook-form';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Switch,
+  TextInput,
+} from 'react-native';
 
+import { usePutThresholds, useThresholds } from '@/api';
 import { useAuthStore } from '@/auth/auth-store';
 import { Card, CardHeader } from '@/components/card';
 import { ScreenShell } from '@/components/screen-shell';
@@ -10,32 +20,195 @@ import { SegmentedControl, type SegmentOption } from '@/components/segmented-con
 import { SettingInput } from '@/components/setting-input';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { APP_NAME, DEVICE_ID } from '@/constants/config';
 import { useSentinelColors } from '@/constants/sentinel-theme';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useLiveStore } from '@/stores/live-store';
 import { useThemeStore, type ThemeMode } from '@/stores/theme-store';
-
-type ThresholdForm = {
-  tMin: string;
-  tMax: string;
-  hMin: string;
-  hMax: string;
-  holdSeconds: string;
-};
-
-const INITIAL_FORM: ThresholdForm = {
-  tMin: '19',
-  tMax: '24',
-  hMin: '40',
-  hMax: '60',
-  holdSeconds: '30',
-};
+import type { ThresholdForm } from '@/types';
+import { connectionLabel, isLiveConnected } from '@/utils/room-state';
+import {
+  formToThresholds,
+  thresholdFormSchema,
+  thresholdsToForm,
+} from '@/utils/thresholds';
 
 const THEME_OPTIONS: readonly SegmentOption<ThemeMode>[] = [
   { value: 'system', label: 'Système' },
   { value: 'light', label: 'Clair' },
   { value: 'dark', label: 'Sombre' },
 ];
+
+function ThresholdFormSection({
+  defaults,
+  isSaving,
+  onSubmit,
+}: {
+  defaults: ThresholdForm;
+  isSaving: boolean;
+  onSubmit: (values: ThresholdForm) => Promise<boolean>;
+}) {
+  // React Hook Form's mutable form API is not compatible with the React
+  // Compiler yet. https://github.com/orgs/react-hook-form/discussions/12524
+  'use no memo';
+
+  const colors = useSentinelColors();
+  const theme = useTheme();
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<ThresholdForm>({
+    resolver: zodResolver(thresholdFormSchema),
+    defaultValues: defaults,
+  });
+
+  const canSave = isDirty && !isSubmitting && !isSaving;
+  const submit = handleSubmit(async (values) => {
+    const saved = await onSubmit(values);
+    if (saved) reset(values);
+  });
+
+  const fieldError = (message: string | undefined) =>
+    message ? (
+      <ThemedText type="small" style={[styles.error, { color: colors.danger }]}>
+        {message}
+      </ThemedText>
+    ) : null;
+
+  return (
+    <>
+      <Card>
+        <CardHeader eyebrow="Seuils de confort" title="Température" />
+
+        <ThemedView type="backgroundElement" style={styles.inputRow}>
+          <Controller
+            control={control}
+            name="tMin"
+            render={({ field: { onChange, value } }) => (
+              <SettingInput
+                label="Minimum"
+                value={value}
+                unit="°C"
+                onChangeText={onChange}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="tMax"
+            render={({ field: { onChange, value } }) => (
+              <SettingInput
+                label="Maximum"
+                value={value}
+                unit="°C"
+                onChangeText={onChange}
+              />
+            )}
+          />
+        </ThemedView>
+        {fieldError(errors.tMin?.message ?? errors.tMax?.message)}
+
+        <ThemedText style={styles.subTitle}>Humidité</ThemedText>
+
+        <ThemedView type="backgroundElement" style={styles.inputRow}>
+          <Controller
+            control={control}
+            name="hMin"
+            render={({ field: { onChange, value } }) => (
+              <SettingInput
+                label="Minimum"
+                value={value}
+                unit="%"
+                onChangeText={onChange}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="hMax"
+            render={({ field: { onChange, value } }) => (
+              <SettingInput
+                label="Maximum"
+                value={value}
+                unit="%"
+                onChangeText={onChange}
+              />
+            )}
+          />
+        </ThemedView>
+        {fieldError(errors.hMin?.message ?? errors.hMax?.message)}
+      </Card>
+
+      <Card>
+        <CardHeader eyebrow="Temporisation" title="Délai avant alerte" />
+        <ThemedText type="small" themeColor="textSecondary" style={styles.description}>
+          Le dépassement doit durer ce temps avant de devenir une alerte.
+        </ThemedText>
+
+        <Controller
+          control={control}
+          name="holdSeconds"
+          render={({ field: { onChange, value } }) => (
+            <ThemedView type="backgroundElement" style={styles.durationWrap}>
+              <TextInput
+                style={[
+                  styles.durationInput,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: colors.borderStrong,
+                    color: theme.text,
+                  },
+                ]}
+                value={value}
+                keyboardType="number-pad"
+                onChangeText={onChange}
+                selectionColor={colors.accent}
+                placeholderTextColor={colors.muted}
+              />
+              <ThemedText
+                type="smallBold"
+                themeColor="textSecondary"
+                style={styles.durationUnit}>
+                secondes
+              </ThemedText>
+            </ThemedView>
+          )}
+        />
+        {fieldError(errors.holdSeconds?.message)}
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canSave }}
+          disabled={!canSave}
+          style={[
+            styles.saveButton,
+            {
+              backgroundColor: canSave
+                ? colors.accentStrong
+                : theme.backgroundSelected,
+              borderColor: colors.borderStrong,
+            },
+          ]}
+          onPress={() => void submit()}>
+          {isSubmitting || isSaving ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <ThemedText
+              style={[
+                styles.saveButtonText,
+                { color: canSave ? '#FFFFFF' : theme.textSecondary },
+              ]}>
+              Enregistrer les réglages
+            </ThemedText>
+          )}
+        </Pressable>
+      </Card>
+    </>
+  );
+}
 
 export default function SettingsScreen() {
   const colors = useSentinelColors();
@@ -46,18 +219,36 @@ export default function SettingsScreen() {
   const themeMode = useThemeStore((state) => state.mode);
   const setThemeMode = useThemeStore((state) => state.setMode);
 
-  const [form, setForm] = useState<ThresholdForm>(INITIAL_FORM);
+  const thresholdsQuery = useThresholds(DEVICE_ID);
+  const saveThresholds = usePutThresholds(DEVICE_ID);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  const dirty = (Object.keys(INITIAL_FORM) as (keyof ThresholdForm)[]).some(
-    (key) => form[key] !== INITIAL_FORM[key],
-  );
+  const connection = useLiveStore((state) => state.connection);
+  const deviceStatus = useLiveStore((state) => state.deviceStatus);
+  const statusLabel = connectionLabel(connection, deviceStatus);
+  const online = isLiveConnected(connection, deviceStatus);
 
-  const setField = (key: keyof ThresholdForm) => (value: string) =>
-    setForm((old) => ({ ...old, [key]: value }));
+  const handleSave = async (values: ThresholdForm): Promise<boolean> => {
+    try {
+      await saveThresholds.mutateAsync(formToThresholds(values));
+      Alert.alert('Réglages', 'Les seuils ont été mis à jour.');
+      return true;
+    } catch {
+      // The mutation cache reports the exception; keep the feedback generic.
+      Alert.alert(
+        'Réglages',
+        'Les seuils n’ont pas pu être enregistrés. Réessaie.',
+      );
+      return false;
+    }
+  };
+
+  const savedForm = thresholdsQuery.data
+    ? thresholdsToForm(thresholdsQuery.data.value)
+    : null;
 
   return (
-    <ScreenShell title="Sentinelle" statusLabel="Connecté" online>
+    <ScreenShell title={APP_NAME} statusLabel={statusLabel} online={online}>
       <ScreenTitle
         eyebrow="RÉGLAGES"
         title="Seuils et alertes"
@@ -72,69 +263,23 @@ export default function SettingsScreen() {
         </ThemedText>
       </Card>
 
-      <Card>
-        <CardHeader eyebrow="Seuils de confort" title="Température" />
-
-        <ThemedView type="backgroundElement" style={styles.inputRow}>
-          <SettingInput
-            label="Minimum"
-            value={form.tMin}
-            unit="°C"
-            onChangeText={setField('tMin')}
-          />
-          <SettingInput
-            label="Maximum"
-            value={form.tMax}
-            unit="°C"
-            onChangeText={setField('tMax')}
-          />
-        </ThemedView>
-
-        <ThemedText style={styles.subTitle}>Humidité</ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.inputRow}>
-          <SettingInput
-            label="Minimum"
-            value={form.hMin}
-            unit="%"
-            onChangeText={setField('hMin')}
-          />
-          <SettingInput
-            label="Maximum"
-            value={form.hMax}
-            unit="%"
-            onChangeText={setField('hMax')}
-          />
-        </ThemedView>
-      </Card>
-
-      <Card>
-        <CardHeader eyebrow="Temporisation" title="Délai avant alerte" />
-        <ThemedText type="small" themeColor="textSecondary" style={styles.description}>
-          Le dépassement doit durer ce temps avant de devenir une alerte.
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.durationWrap}>
-          <TextInput
-            style={[
-              styles.durationInput,
-              {
-                backgroundColor: theme.background,
-                borderColor: colors.borderStrong,
-                color: theme.text,
-              },
-            ]}
-            value={form.holdSeconds}
-            keyboardType="decimal-pad"
-            onChangeText={setField('holdSeconds')}
-            selectionColor={colors.accent}
-            placeholderTextColor={colors.muted}
-          />
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.durationUnit}>
-            secondes
+      {savedForm ? (
+        <ThresholdFormSection
+          key={JSON.stringify(savedForm)}
+          defaults={savedForm}
+          isSaving={saveThresholds.isPending}
+          onSubmit={handleSave}
+        />
+      ) : (
+        <Card>
+          <CardHeader eyebrow="Seuils de confort" title="Surveillance" />
+          <ThemedText type="small" themeColor="textSecondary">
+            {thresholdsQuery.isPending
+              ? 'Chargement des seuils…'
+              : 'Impossible de charger les seuils.'}
           </ThemedText>
-        </ThemedView>
-      </Card>
+        </Card>
+      )}
 
       <Card>
         <CardHeader eyebrow="Alertes" title="Notifications locales" />
@@ -151,31 +296,6 @@ export default function SettingsScreen() {
           />
         </ThemedView>
       </Card>
-
-      {dirty && (
-        <ThemedView
-          style={[
-            styles.syncBox,
-            { backgroundColor: colors.warningSoft, borderColor: colors.warningBorderStrong },
-          ]}>
-          <ThemedText type="small" style={[styles.syncText, { color: colors.warning }]}>
-            ☁️ Des seuils attendent leur synchronisation.
-          </ThemedText>
-        </ThemedView>
-      )}
-
-      {/* TODO: wire these to the backend once it lands. */}
-      <Pressable
-        disabled
-        accessibilityState={{ disabled: true }}
-        style={[
-          styles.saveButton,
-          { backgroundColor: theme.backgroundSelected, borderColor: colors.borderStrong },
-        ]}>
-        <ThemedText themeColor="textSecondary" style={styles.saveButtonText}>
-          Enregistrer les réglages
-        </ThemedText>
-      </Pressable>
 
       <Pressable
         accessibilityRole="button"
@@ -208,6 +328,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  error: {
+    marginTop: 6,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '700',
+  },
   durationWrap: {
     marginTop: 15,
     flexDirection: 'row',
@@ -235,20 +361,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
-  syncBox: {
-    borderRadius: Spacing.three,
-    borderWidth: 1,
-    padding: 13,
-    marginBottom: 13,
-  },
-  syncText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
   saveButton: {
     borderRadius: 19,
     borderWidth: 1,
     paddingVertical: 15,
+    marginTop: 18,
     marginBottom: 14,
   },
   saveButtonText: {

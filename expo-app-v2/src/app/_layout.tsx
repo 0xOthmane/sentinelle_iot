@@ -5,6 +5,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { ApiProvider } from '@/api';
 import { useAuthStore } from '@/auth/auth-store';
 import { SENTRY_DSN } from '@/constants/config';
+import { LiveProvider } from '@/live/live-provider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import * as Sentry from '@sentry/react-native';
@@ -71,7 +72,9 @@ function RootNavigator() {
 function RootLayout() {
   return (
     <ApiProvider>
-      <RootNavigator />
+      <LiveProvider>
+        <RootNavigator />
+      </LiveProvider>
     </ApiProvider>
   );
 }

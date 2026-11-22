@@ -45,8 +45,10 @@ export type Thresholds = z.infer<typeof thresholdsSchema>;
 
 export const alertEventSchema = z.object({
   kind: z.string(),
-  value: z.number().optional(),
-  threshold: z.number().optional(),
+  // The backend sends null when a bound or reading was missing when the
+  // alert fired, so these cannot be plain optional numbers.
+  value: z.number().nullish(),
+  threshold: z.number().nullish(),
   ts: z.number().optional(),
 });
 
