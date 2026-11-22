@@ -2,7 +2,7 @@ import { QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppState } from 'react-native';
 
-import { clearToken } from '@/auth/tokenStore';
+import { useAuthStore } from '@/auth/auth-store';
 import { createQueryClient } from './query-client';
 import { setUnauthorizedHandler } from './utils/http';
 
@@ -16,7 +16,9 @@ export function ApiProvider({ children, onUnauthorized }: ApiProviderProps) {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      void clearToken();
+      // A 401 means the session is gone: drop the token and let the router
+      // guard in `_layout.tsx` redirect to /login.
+      void useAuthStore.getState().signOut();
       queryClient.clear();
       onUnauthorized?.();
     });

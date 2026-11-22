@@ -1,6 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Switch, TextInput } from 'react-native';
 
+import { useAuthStore } from '@/auth/auth-store';
 import { Card, CardHeader } from '@/components/card';
 import { ScreenShell } from '@/components/screen-shell';
 import { ScreenTitle } from '@/components/screen-title';
@@ -38,6 +40,8 @@ const THEME_OPTIONS: readonly SegmentOption<ThemeMode>[] = [
 export default function SettingsScreen() {
   const colors = useSentinelColors();
   const theme = useTheme();
+  const queryClient = useQueryClient();
+  const signOut = useAuthStore((state) => state.signOut);
 
   const themeMode = useThemeStore((state) => state.mode);
   const setThemeMode = useThemeStore((state) => state.setMode);
@@ -174,10 +178,13 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Pressable
-        disabled
-        accessibilityState={{ disabled: true }}
-        style={[styles.logoutButton, { borderColor: colors.borderStrong }]}>
-        <ThemedText themeColor="textSecondary" style={styles.logoutButtonText}>
+        accessibilityRole="button"
+        style={[styles.logoutButton, { borderColor: colors.borderStrong }]}
+        onPress={() => {
+          void signOut();
+          queryClient.clear();
+        }}>
+        <ThemedText style={[styles.logoutButtonText, { color: colors.danger }]}>
           Se déconnecter
         </ThemedText>
       </Pressable>

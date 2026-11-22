@@ -52,5 +52,7 @@ Docs: https://docs.expo.dev/eas/index.md
 ## React Dependencies
 
 - Use Zod (`zod`) for runtime validation and type-safe schemas.
+- Use React Hook Form (`react-hook-form`) with `@hookform/resolvers` (`zodResolver`) for every form. Define each form's schema with Zod and keep validation rules there, not inline in handlers or components.
+- The React Compiler (enabled in `app.json`) is not compatible with React Hook Form's mutable API yet. Add `'use no memo';` at the top of components that use `Controller`, `watch`, `getValues`, `reset`, or `useFieldArray`.
 - Use Zustand (`zustand`) for shared application state. Keep component-local state in React state unless state truly needs to be shared.
 - Before adding or changing a React effect, read https://react.dev/learn/you-might-not-need-an-effect and check whether the behavior can be expressed with event handlers, derived values, or another React-native pattern instead.

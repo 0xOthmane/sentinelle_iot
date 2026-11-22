@@ -65,7 +65,41 @@ export default function HomeScreen() {
           max={THRESHOLDS.hMax}
         />
       </ThemedView>
+      <Card>
+        <CardHeader
+          eyebrow="Aperçu"
+          title="10 dernières minutes"
+          right={
+            <ThemedView type="backgroundElement" style={styles.liveRow}>
+              <ThemedView style={[styles.liveDot, { backgroundColor: colors.success }]} />
+              <ThemedText type="small" style={[styles.liveText, { color: colors.success }]}>
+                LIVE
+              </ThemedText>
+            </ThemedView>
+          }
+        />
 
+        <SoftChart
+          data={SAMPLE_MEASUREMENTS}
+          unit="°C"
+          minThreshold={THRESHOLDS.tMin}
+          maxThreshold={THRESHOLDS.tMax}
+        />
+
+        <Pressable
+          style={[
+            styles.softButton,
+            { backgroundColor: colors.accentSoft, borderColor: colors.accent },
+          ]}
+          onPress={() => router.push('/history')}>
+          <ThemedText
+            type="smallBold"
+            style={[styles.softButtonText, { color: colors.accentText }]}>
+            Voir tout l’historique
+          </ThemedText>
+        </Pressable>
+      </Card>
+      
       <Card>
         <CardHeader
           eyebrow="Seuils de confort"
@@ -126,40 +160,7 @@ export default function HomeScreen() {
         onToggle={setLedOn}
       />
 
-      <Card>
-        <CardHeader
-          eyebrow="Aperçu"
-          title="10 dernières minutes"
-          right={
-            <ThemedView type="backgroundElement" style={styles.liveRow}>
-              <ThemedView style={[styles.liveDot, { backgroundColor: colors.success }]} />
-              <ThemedText type="small" style={[styles.liveText, { color: colors.success }]}>
-                LIVE
-              </ThemedText>
-            </ThemedView>
-          }
-        />
-
-        <SoftChart
-          data={SAMPLE_MEASUREMENTS}
-          unit="°C"
-          minThreshold={THRESHOLDS.tMin}
-          maxThreshold={THRESHOLDS.tMax}
-        />
-
-        <Pressable
-          style={[
-            styles.softButton,
-            { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-          ]}
-          onPress={() => router.push('/history')}>
-          <ThemedText
-            type="smallBold"
-            style={[styles.softButtonText, { color: colors.accentText }]}>
-            Voir tout l’historique
-          </ThemedText>
-        </Pressable>
-      </Card>
+      
     </ScreenShell>
   );
 }
